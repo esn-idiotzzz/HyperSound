@@ -93,6 +93,9 @@ public class MainActivity extends Activity {
             }
         });
 
+        if (savedInstanceState != null) {
+            pendingKey = savedInstanceState.getString("pending_key");
+        }
         Store.prune(this);
         rebuild();
     }
@@ -236,44 +239,72 @@ public class MainActivity extends Activity {
     }
 
     private void preview(String key) {
-        if (Store.file(this, key) == null) {
-            toast(getString(R.string.no_custom));
-            return;
-        }
         File file = Store.file(this, key);
         if (file == null) {
             toast(getString(R.string.no_custom));
             return;
         }
         stopPreview();
+        final MediaPlayer mp = new MediaPlayer();
+        // 先把字段指向新实例，回调里再比对身份，避免上一次的完成回调把这一次顶掉。
+        player = mp;
         try {
-            player = new MediaPlayer();
-            player.setDataSource(file.getAbsolutePath());
-            player.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
+            mp.setAudioAttributes(new android.media.AudioAttributes.Builder()
+                    .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
+                    .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC)
+                    .build());
+            mp.setDataSource(file.getAbsolutePath());
+            mp.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
                 @Override
-                public void onCompletion(MediaPlayer mp) {
-                    stopPreview();
+                public void onCompletion(MediaPlayer m) {
+                    if (player == m) {
+                        stopPreview();
+                    }
                 }
             });
-            player.prepare();
-            player.start();
+            mp.setOnErrorListener(new MediaPlayer.OnErrorListener() {
+                @Override
+                public boolean onError(MediaPlayer m, int what, int extra) {
+                    if (player == m) {
+                        stopPreview();
+                        toast("这个音频无法播放，换一个试试");
+                    }
+                    return true;
+                }
+            });
+            mp.prepare();
+            mp.start();
         } catch (Throwable t) {
+            if (player == mp) {
+                stopPreview();
+            }
             toast("播放失败：" + t.getMessage());
-            stopPreview();
         }
     }
 
     private void stopPreview() {
-        if (player != null) {
-            try {
-                player.stop();
-            } catch (Throwable ignored) {
+        MediaPlayer p = player;
+        player = null;
+        if (p == null) {
+            return;
+        }
+        try {
+            p.setOnCompletionListener(null);
+        } catch (Throwable ignored) {
+        }
+        try {
+            p.setOnErrorListener(null);
+        } catch (Throwable ignored) {
+        }
+        try {
+            if (p.isPlaying()) {
+                p.stop();
             }
-            try {
-                player.release();
-            } catch (Throwable ignored) {
-            }
-            player = null;
+        } catch (Throwable ignored) {
+        }
+        try {
+            p.release();
+        } catch (Throwable ignored) {
         }
     }
 
@@ -289,6 +320,7 @@ public class MainActivity extends Activity {
                 .setPositiveButton("恢复默认", new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface d, int w) {
+                        stopPreview();
                         Store.clear(MainActivity.this, slot.key);
                         rebuild();
                         toast("已恢复默认");
@@ -305,6 +337,7 @@ public class MainActivity extends Activity {
                 .setPositiveButton("全部恢复", new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface d, int w) {
+                        stopPreview();
                         Store.clearAll(MainActivity.this);
                         rebuild();
                         toast("已全部恢复默认");
@@ -332,11 +365,9 @@ public class MainActivity extends Activity {
             "com.android.systemui",
             "com.miui.securitycenter",
             "com.miui.screenshot",
-            "com.android.camera",
             "com.android.mms",
-            "com.android.settings",
-            "com.miui.powerkeeper",
             "com.android.deskclock",
+            "com.android.incallui",
     };
 
     private void doApply() {
@@ -359,6 +390,7 @@ public class MainActivity extends Activity {
     }
 
     private void restartSystemUi() {
+        stopPreview();
         toast("正在重启相关进程…");
         new Thread(new Runnable() {
             @Override
@@ -401,29 +433,28 @@ public class MainActivity extends Activity {
         }
         if (pids.isEmpty()) {
             suRun("killall com.android.systemui");
-            return 1;
+            sleep(1200);
+            return suRun("pidof com.android.systemui").trim().length() > 0 ? 1 : 0;
         }
         StringBuilder cmd = new StringBuilder("kill");
         for (String pid : pids) {
             cmd.append(' ').append(pid);
         }
         suRun(cmd.toString());
-        reloadSoundEffects();
         sleep(1200);
+        if (hitPkgs.contains("com.android.systemui")) {
+            boolean alive = suRun("pidof com.android.systemui").trim().length() > 0;
+            if (!alive) {
+                sleep(900);
+                alive = suRun("pidof com.android.systemui").trim().length() > 0;
+            }
+            if (!alive) {
+                return 0;
+            }
+        }
         return hitPkgs.size();
     }
 
-    /** 让 system_server 的 AudioService 重新加载音效（按键/触摸音），无需重启手机。 */
-    private void reloadSoundEffects() {
-        String cur = suRun("settings get system sound_effects_enabled").trim();
-        if (!"1".equals(cur)) {
-            return;
-        }
-        suRun("settings put system sound_effects_enabled 0");
-        sleep(400);
-        suRun("settings put system sound_effects_enabled 1");
-        sleep(400);
-    }
     private String suRun(String cmd) {
         for (String su : SU_PATHS) {
             try {
@@ -459,7 +490,7 @@ public class MainActivity extends Activity {
                         + "· 重启手机；或\n"
                         + "· 在 LSPosed 里停用再启用本模块后重启系统界面；或\n"
                         + "· 用 root 终端执行：killall com.android.systemui\n\n"
-                        + "注意：按键、触摸等由「系统框架」播放的音效，必须重启手机才会生效。")
+                        + "注意：由「系统框架」播放的音效（低电量等）需要重启手机才会重新加载。")
                 .setPositiveButton("知道了", null)
                 .show();
     }
@@ -499,6 +530,20 @@ public class MainActivity extends Activity {
     }
 
     @Override
+    protected void onStop() {
+        stopPreview();
+        super.onStop();
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        if (pendingKey != null) {
+            outState.putString("pending_key", pendingKey);
+        }
+    }
+
+    @Override
     protected void onDestroy() {
         stopPreview();
         super.onDestroy();
@@ -528,12 +573,12 @@ public class MainActivity extends Activity {
 
         @Override
         public int getItemViewType(int position) {
-            return items.get(position) instanceof String ? 0 : 1;
+            return (position >= 0 && position < items.size() && items.get(position) instanceof String) ? 0 : 1;
         }
 
         @Override
         public boolean isEnabled(int position) {
-            return !(items.get(position) instanceof String);
+            return position >= 0 && position < items.size() && !(items.get(position) instanceof String);
         }
 
         @Override
