@@ -84,6 +84,7 @@ public final class Hooks {
             hookAppContext();
             installed = true;
             log("installed in " + process + " (SoundPool.load=" + loads + ", MediaPlayer=" + mps + ")");
+            status("installed in " + process);
         } catch (Throwable t) {
             log("install error: " + t);
         }
@@ -162,7 +163,7 @@ public final class Hooks {
                     String path = (String) a0;
                     slot = Slots.match(path);
                     if (slot == null && path.length() > 0 && path.indexOf("/audio/") >= 0) {
-                        logOnce("miss: " + path);
+                        miss(path);
                     }
                 } else if (a0 instanceof Context) {
                     Context c = (Context) a0;
@@ -197,7 +198,11 @@ public final class Hooks {
                 Object a0 = chain.getArg(0);
                 Slots.Slot slot = null;
                 if (a0 instanceof String) {
-                    slot = Slots.match((String) a0);
+                    String path = (String) a0;
+                    slot = Slots.match(path);
+                    if (slot == null && path.indexOf("/audio/") >= 0) {
+                        miss(path);
+                    }
                 } else if (a0 instanceof Context) {
                     Context c = (Context) a0;
                     if (appCtx == null) {
@@ -252,6 +257,11 @@ public final class Hooks {
             String alarm = Settings.System.getString(cr, "alarm_alert");
             if (alarm != null && alarm.equals(s)) {
                 return Slots.byKey("alarm");
+            }
+            // 充电提示音（system_server Notifier 用 Settings.Global 里的 URI 播放）
+            String chg = Settings.Global.getString(cr, "charging_started_sound");
+            if (chg != null && chg.equals(s)) {
+                return Slots.byKey("charge");
             }
         } catch (Throwable ignored) {
         }
@@ -451,6 +461,44 @@ public final class Hooks {
         try {
             ContentValues v = new ContentValues();
             v.put("line", "[" + proc + "] " + msg);
+            c.getContentResolver().insert(Uri.parse("content://com.hypersound.mod.sounds/log"), v);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    /** 注入状态：拿不到 appCtx 时也尽量回写一次，App 用它显示作用域是否生效。 */
+    private static void status(String msg) {
+        log(msg);
+        Context c = appCtx != null ? appCtx : context();
+        if (c == null) {
+            return;
+        }
+        try {
+            ContentValues v = new ContentValues();
+            v.put("line", "\u25cf " + msg);
+            c.getContentResolver().insert(Uri.parse("content://com.hypersound.mod.sounds/log"), v);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    /** 系统请求了但没匹配到槽位的音效名，回写到 App 日志（去重）。 */
+    private static void miss(String path) {
+        String base = path;
+        int slash = path.lastIndexOf(47);
+        if (slash >= 0) {
+            base = path.substring(slash + 1);
+        }
+        if (once.size() > 200 || !once.add("miss:" + base)) {
+            return;
+        }
+        log("miss: " + path);
+        Context c = appCtx;
+        if (c == null) {
+            return;
+        }
+        try {
+            ContentValues v = new ContentValues();
+            v.put("line", "miss: " + base + "  @" + proc);
             c.getContentResolver().insert(Uri.parse("content://com.hypersound.mod.sounds/log"), v);
         } catch (Throwable ignored) {
         }

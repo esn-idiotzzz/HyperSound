@@ -32,6 +32,7 @@ public class MainActivity extends Activity {
     private TextView tabModified;
     private TextView empty;
     private TextView btnApply;
+    private TextView tvStatus;
     private Adapter adapter;
     private MediaPlayer player;
     private String pendingKey;
@@ -48,6 +49,7 @@ public class MainActivity extends Activity {
         tabModified = (TextView) findViewById(R.id.tab_modified);
         empty = (TextView) findViewById(R.id.tv_empty);
         btnApply = (TextView) findViewById(R.id.btn_apply);
+        tvStatus = (TextView) findViewById(R.id.tv_status);
 
         btnApply.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -142,6 +144,20 @@ public class MainActivity extends Activity {
         boolean pending = Store.version(this) != Store.appliedVersion(this);
         btnApply.setText(getString(pending ? R.string.apply_pending : R.string.apply));
         btnApply.setAlpha(pending ? 1f : 0.82f);
+
+        String log = Store.readLog(this);
+        boolean sysui = log.indexOf("installed in com.android.systemui") >= 0;
+        boolean sys = log.indexOf("installed in android") >= 0;
+        if (sysui && sys) {
+            tvStatus.setText("作用域：系统界面 \u2713   系统框架 \u2713");
+            tvStatus.setTextColor(0xFF6FD08C);
+        } else if (sysui) {
+            tvStatus.setText("作用域：系统界面 \u2713   系统框架 \u2717 —— 按键/触摸/充电音需要系统框架");
+            tvStatus.setTextColor(0xFFFFB86B);
+        } else {
+            tvStatus.setText("未检测到注入：请在 LSPosed 勾选「系统界面」后重启手机");
+            tvStatus.setTextColor(0xFFFF8A80);
+        }
 
         boolean blank = items.isEmpty();
         empty.setVisibility(blank ? View.VISIBLE : View.GONE);

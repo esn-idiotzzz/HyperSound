@@ -1,7 +1,7 @@
 id=hypersound
 name=HyperSound
-version=1.3
-versionCode=4
+version=1.4
+versionCode=5
 author=HyperSound
 description=澎湃OS 4 系统音效自定义：锁屏/解锁/按键/触摸/充电/低电量/截图/相机/消息等 30 处音效可替换
 minApiVersion=101
