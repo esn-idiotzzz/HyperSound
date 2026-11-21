@@ -1,7 +1,7 @@
 android
 com.android.systemui
 com.miui.securitycenter
-com.android.camera
-com.android.mms
 com.miui.screenshot
-com.android.settings
+com.android.mms
+com.android.deskclock
+com.android.incallui

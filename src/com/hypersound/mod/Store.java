@@ -190,6 +190,61 @@ public final class Store {
         }
     }
 
+    /** 清掉已删除槽位留下的配置和音频文件，避免残留影响。 */
+    public static void prune(Context c) {
+        try {
+            SharedPreferences p = prefs(c);
+            java.util.Set<String> valid = new java.util.HashSet<String>();
+            for (Slots.Slot s : Slots.all()) {
+                valid.add(s.key);
+            }
+            SharedPreferences.Editor e = p.edit();
+            boolean changed = false;
+            for (String k : new java.util.ArrayList<String>(p.getAll().keySet())) {
+                if (k.startsWith(P_FILE) || k.startsWith(P_NAME)) {
+                    if (!valid.contains(k.substring(2))) {
+                        e.remove(k);
+                        changed = true;
+                    }
+                }
+            }
+            if (changed) {
+                e.apply();
+            }
+            java.util.Set<String> keep = new java.util.HashSet<String>();
+            for (Slots.Slot s : Slots.all()) {
+                File f = file(c, s.key);
+                if (f != null) {
+                    keep.add(f.getName());
+                }
+            }
+            File[] fs = dir(c).listFiles();
+            if (fs != null) {
+                for (File f : fs) {
+                    if (!keep.contains(f.getName())) {
+                        //noinspection ResultOfMethodCallIgnored
+                        f.delete();
+                    }
+                }
+            }
+            File md = mirrorDir(c);
+            if (md != null) {
+                File[] ms = md.listFiles();
+                if (ms != null) {
+                    for (File f : ms) {
+                        String n = f.getName();
+                        int dot = n.indexOf('.');
+                        String key = dot > 0 ? n.substring(0, dot) : n;
+                        if (!valid.contains(key)) {
+                            //noinspection ResultOfMethodCallIgnored
+                            f.delete();
+                        }
+                    }
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+    }
     public static int version(Context c) {
         return prefs(c).getInt(K_VER, 0);
     }

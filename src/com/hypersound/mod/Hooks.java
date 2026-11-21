@@ -20,53 +20,30 @@ import io.github.libxposed.api.XposedInterface;
 import io.github.libxposed.api.XposedModule;
 
 /**
- * 实际的 Hook 实现：在“系统界面 / 系统框架”等进程里，把系统要加载的音效替换成模块 App 里的文件。
- * 全部逻辑都做了兜底：任何异常都会退回系统原始行为。
+ * Hook 实现：在 SystemUI / 安全中心 / 短信 / 截图等进程里，把系统加载的音效换成模块 App 里的文件。
+ * 所有逻辑都做了兜底，任何异常都会退回系统原始行为。
  */
 public final class Hooks {
 
     private static final String TAG = "HyperSound";
 
-    /** App 会把音效额外镜像到这里（无需权限、任何进程都能按路径读）。 */
+    /** App 额外镜像的目录，拿不到 Context 时按路径加载。 */
     private static final String MIRROR_DIR =
             "/storage/emulated/0/Android/media/com.hypersound.mod/sounds";
 
     private static XposedModule module;
     private static String proc = "?";
     private static volatile Context appCtx;
-    private static int ctxTries;
     private static boolean installed;
 
     private static long lastPush;
-    private static final ThreadLocal<Boolean> REPLACING = new ThreadLocal<Boolean>();
-    /** 资源方式加载的音效：AssetFileDescriptor -> 槽位（相机等 App 用 assets 播放）。 */
-    private static final java.util.Map<Object, Slots.Slot> AFD_MAP =
-            java.util.Collections.synchronizedMap(new java.util.WeakHashMap<Object, Slots.Slot>());
     private static final Set<String> once = Collections.synchronizedSet(new HashSet<String>());
+    private static final ThreadLocal<Boolean> REPLACING = new ThreadLocal<Boolean>();
 
     private static volatile Map<String, File> mirrorCache;
     private static volatile long mirrorAt;
 
-    /** 需要注入的进程。 */
-    private static final String[] TARGETS = {
-            "com.android.systemui",
-            "com.miui.home",
-            "com.android.settings",
-            "com.android.phone",
-            "com.android.dialer",
-            "com.android.contacts",
-            "com.android.mms",
-            "com.miui.screenshot",
-            "com.android.camera",
-            "com.android.incallui",
-    };
-
     private Hooks() {
-    }
-
-    /** 被 LSPosed 注入的进程都是用户勾选过的，一律安装 hook。 */
-    public static boolean isTarget(String pkg) {
-        return pkg != null && pkg.length() > 0;
     }
 
     public static synchronized void install(XposedModule m, String process, ClassLoader cl) {
@@ -79,8 +56,6 @@ public final class Hooks {
             int loads = hookSoundPool();
             int mps = hookMediaPlayer();
             hookAppContext();
-            hookAssets();
-            hookProbes();
             installed = true;
             log("installed in " + process + " (SoundPool.load=" + loads + ", MediaPlayer=" + mps + ")");
             status("installed in " + process);
@@ -91,8 +66,7 @@ public final class Hooks {
 
     private static int hookSoundPool() {
         int n = 0;
-        Method[] methods = SoundPool.class.getDeclaredMethods();
-        for (Method m : methods) {
+        for (Method m : SoundPool.class.getDeclaredMethods()) {
             if (!"load".equals(m.getName())) {
                 continue;
             }
@@ -110,8 +84,7 @@ public final class Hooks {
 
     private static int hookMediaPlayer() {
         int n = 0;
-        Method[] methods = MediaPlayer.class.getDeclaredMethods();
-        for (Method m : methods) {
+        for (Method m : MediaPlayer.class.getDeclaredMethods()) {
             if (!"setDataSource".equals(m.getName())) {
                 continue;
             }
@@ -127,176 +100,6 @@ public final class Hooks {
         return n;
     }
 
-    /** 诊断探针：把相机等 App 的其它播放路径记录下来，便于定位。 */
-    private static void hookProbes() {
-        try {
-            Method[] ams = android.media.AudioManager.class.getDeclaredMethods();
-            for (Method m : ams) {
-                if (!"playSoundEffect".equals(m.getName())) {
-                    continue;
-                }
-                module.hook(m)
-                        .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
-                        .intercept(new XposedInterface.Hooker() {
-                            @Override
-                            public Object intercept(XposedInterface.Chain chain) throws Throwable {
-                                try {
-                                    Object a0 = chain.getArg(0);
-                                    if ("com.android.camera".equals(proc) && a0 instanceof Integer) {
-                                        if (playSlotSound("camera") || playSlotSound("video_record") || playSlotSound("video_stop")) {
-                                            push("替换 camera (playSoundEffect) @" + proc);
-                                            return null;
-                                        }
-                                    }
-                                    probe("playSoundEffect " + a0);
-                                } catch (Throwable ignored) {
-                                }
-                                return chain.proceed();
-                            }
-                        });
-            }
-            Method[] mas = android.media.MediaActionSound.class.getDeclaredMethods();
-            for (Method m : mas) {
-                if (!"play".equals(m.getName())) {
-                    continue;
-                }
-                module.hook(m)
-                        .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
-                        .intercept(new XposedInterface.Hooker() {
-                            @Override
-                            public Object intercept(XposedInterface.Chain chain) throws Throwable {
-                                try {
-                                    probe("MediaActionSound " + chain.getArg(0));
-                                } catch (Throwable ignored) {
-                                }
-                                return chain.proceed();
-                            }
-                        });
-            }
-            Method open = android.content.res.AssetManager.class.getDeclaredMethod("open", String.class);
-            module.hook(open)
-                    .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
-                    .intercept(new XposedInterface.Hooker() {
-                        @Override
-                        public Object intercept(XposedInterface.Chain chain) throws Throwable {
-                            try {
-                                Object a = chain.getArg(0);
-                                if (a instanceof String) {
-                                    String n = ((String) a).toLowerCase();
-                                    if (n.endsWith(".wav") || n.endsWith(".ogg") || n.endsWith(".mp3")) {
-                                        probe("assetOpen " + a);
-                                    }
-                                }
-                            } catch (Throwable ignored) {
-                            }
-                            return chain.proceed();
-                        }
-                    });
-            log("probes installed");
-        } catch (Throwable t) {
-            log("hookProbes failed: " + t);
-        }
-    }
-
-    /** 在目标进程里直接播放指定槽位的音频（用于 playSoundEffect 这类没有文件名的调用）。 */
-    private static boolean playSlotSound(String key) {
-        Context c = context();
-        if (c == null) {
-            return false;
-        }
-        try {
-            if (!Cfg.get(c).has(key)) {
-                return false;
-            }
-        } catch (Throwable t) {
-            return false;
-        }
-        File m = mirrorFile(key);
-        if (m == null) {
-            return false;
-        }
-        try {
-            final MediaPlayer mp = new MediaPlayer();
-            android.media.AudioAttributes attrs = new android.media.AudioAttributes.Builder()
-                    .setUsage(android.media.AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
-                    .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                    .build();
-            mp.setAudioAttributes(attrs);
-            mp.setDataSource(m.getAbsolutePath());
-            mp.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
-                @Override
-                public void onCompletion(MediaPlayer x) {
-                    try {
-                        x.release();
-                    } catch (Throwable ignored) {
-                    }
-                }
-            });
-            mp.prepare();
-            mp.start();
-            return true;
-        } catch (Throwable t) {
-            logOnce("playSlot " + key + " fail: " + t);
-            return false;
-        }
-    }
-    private static void probe(String msg) {
-        if (once.size() > 300 || !once.add("probe:" + msg)) {
-            return;
-        }
-        log("probe " + msg);
-        Context c = appCtx != null ? appCtx : context();
-        if (c == null) {
-            return;
-        }
-        try {
-            ContentValues v = new ContentValues();
-            v.put("line", "probe " + msg + "  @" + proc);
-            c.getContentResolver().insert(Uri.parse("content://com.hypersound.mod.sounds/log"), v);
-        } catch (Throwable ignored) {
-        }
-    }
-    /** 相机等 App 通过 AssetManager 打开 assets 里的音频，这里记录名字与 AFD 的对应关系。 */
-    private static void hookAssets() {
-        try {
-            Class<?> am = android.content.res.AssetManager.class;
-            for (Method m : am.getDeclaredMethods()) {
-                String n = m.getName();
-                if (!"openFd".equals(n) && !"openNonAssetFd".equals(n)) {
-                    continue;
-                }
-                Class<?>[] pt = m.getParameterTypes();
-                if (pt.length != 1 || pt[0] != String.class) {
-                    continue;
-                }
-                module.hook(m)
-                        .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
-                        .intercept(new AssetHook());
-            }
-            log("AssetManager hooks installed");
-        } catch (Throwable t) {
-            log("hookAssets failed: " + t);
-        }
-    }
-
-    private static final class AssetHook implements XposedInterface.Hooker {
-        @Override
-        public Object intercept(XposedInterface.Chain chain) throws Throwable {
-            Object r = chain.proceed();
-            try {
-                Object name = chain.getArg(0);
-                if (r instanceof android.content.res.AssetFileDescriptor && name instanceof String) {
-                    Slots.Slot s = Slots.match((String) name);
-                    if (s != null) {
-                        AFD_MAP.put(r, s);
-                    }
-                }
-            } catch (Throwable ignored) {
-            }
-            return r;
-        }
-    }
-    /** 尽早拿到 Application 的 Context，供没有 Context 参数的 load(String) 使用。 */
     private static void hookAppContext() {
         try {
             Method m = android.app.Application.class.getDeclaredMethod("attach", Context.class);
@@ -320,7 +123,6 @@ public final class Hooks {
         }
     }
 
-    /** SoundPool.load 的所有重载共用一个拦截器。 */
     private static final class LoadHook implements XposedInterface.Hooker {
         @Override
         public Object intercept(XposedInterface.Chain chain) throws Throwable {
@@ -333,7 +135,7 @@ public final class Hooks {
                 if (a0 instanceof String) {
                     String path = (String) a0;
                     slot = Slots.match(path);
-                    if (slot == null && path.length() > 0 && path.indexOf("/audio/") >= 0) {
+                    if (slot == null && path.indexOf("/audio/") >= 0) {
                         miss(path);
                     }
                 } else if (a0 instanceof Context) {
@@ -361,7 +163,6 @@ public final class Hooks {
         }
     }
 
-    /** MediaPlayer.setDataSource 的所有重载共用一个拦截器。 */
     private static final class PlayerHook implements XposedInterface.Hooker {
         @Override
         public Object intercept(XposedInterface.Chain chain) throws Throwable {
@@ -377,8 +178,6 @@ public final class Hooks {
                     if (slot == null && path.indexOf("/audio/") >= 0) {
                         miss(path);
                     }
-                } else if (a0 instanceof android.content.res.AssetFileDescriptor) {
-                    slot = AFD_MAP.get(a0);
                 } else if (a0 instanceof Context) {
                     Context c = (Context) a0;
                     if (appCtx == null) {
@@ -406,14 +205,13 @@ public final class Hooks {
 
     private static Slots.Slot matchResource(Context c, int resId) {
         try {
-            String name = c.getResources().getResourceEntryName(resId);
-            return Slots.match(name);
+            return Slots.match(c.getResources().getResourceEntryName(resId));
         } catch (Throwable t) {
             return null;
         }
     }
 
-    /** 铃声/通知/闹钟走 Settings 里的 content:// URI，名字里没线索，需要比对设置值。 */
+    /** 铃声/通知/闹钟走 Settings 里的 content:// URI，需要比对设置值。 */
     private static Slots.Slot matchUri(Context c, Uri uri) {
         Slots.Slot slot = Slots.match(uri.getLastPathSegment());
         if (slot == null) {
@@ -437,7 +235,6 @@ public final class Hooks {
             if (alarm != null && alarm.equals(s)) {
                 return Slots.byKey("alarm");
             }
-            // 充电提示音（system_server Notifier 用 Settings.Global 里的 URI 播放）
             String chg = Settings.Global.getString(cr, "charging_started_sound");
             if (chg != null && chg.equals(s)) {
                 return Slots.byKey("charge");
@@ -456,24 +253,20 @@ public final class Hooks {
                     seen(slot);
                     return null;
                 }
-                if (Cfg.get(c).has(slot.key)) {
-                    afd = c.getContentResolver().openAssetFileDescriptor(Cfg.uriSound(slot.key), "r");
-                    if (afd != null) {
-                        int id;
-                        REPLACING.set(Boolean.TRUE);
-                        try {
-                            id = ((SoundPool) pool).load(afd, 1);
-                        } finally {
-                            REPLACING.remove();
-                        }
-                        if (id > 0) {
-                            push("替换 " + slot.key + " → id=" + id + " @" + proc);
-                            return Integer.valueOf(id);
-                        }
-                        log("load(" + slot.key + ") returned " + id);
+                afd = c.getContentResolver().openAssetFileDescriptor(Cfg.uriSound(slot.key), "r");
+                if (afd != null) {
+                    int id;
+                    REPLACING.set(Boolean.TRUE);
+                    try {
+                        id = ((SoundPool) pool).load(afd, 1);
+                    } finally {
+                        REPLACING.remove();
                     }
-                } else {
-                    return null;
+                    if (id > 0) {
+                        push("替换 " + slot.key + " → id=" + id + " @" + proc);
+                        return Integer.valueOf(id);
+                    }
+                    log("load(" + slot.key + ") returned " + id);
                 }
             } catch (Throwable t) {
                 logOnce("provider fail " + slot.key + ": " + t);
@@ -486,7 +279,6 @@ public final class Hooks {
                 }
             }
         }
-        // 兜底：直接读镜像文件（system_server 等拿不到 Context 时也能用）
         File m = mirrorFile(slot.key);
         if (m != null) {
             try {
@@ -517,21 +309,17 @@ public final class Hooks {
                     seen(slot);
                     return false;
                 }
-                if (Cfg.get(c).has(slot.key)) {
-                    afd = c.getContentResolver().openAssetFileDescriptor(Cfg.uriSound(slot.key), "r");
-                    if (afd != null) {
-                        REPLACING.set(Boolean.TRUE);
-                        try {
-                            ((MediaPlayer) mp).setDataSource(afd.getFileDescriptor(),
-                                    afd.getStartOffset(), afd.getLength());
-                        } finally {
-                            REPLACING.remove();
-                        }
-                        push("替换 " + slot.key + " (MediaPlayer) @" + proc);
-                        return true;
+                afd = c.getContentResolver().openAssetFileDescriptor(Cfg.uriSound(slot.key), "r");
+                if (afd != null) {
+                    REPLACING.set(Boolean.TRUE);
+                    try {
+                        ((MediaPlayer) mp).setDataSource(afd.getFileDescriptor(),
+                                afd.getStartOffset(), afd.getLength());
+                    } finally {
+                        REPLACING.remove();
                     }
-                } else {
-                    return false;
+                    push("替换 " + slot.key + " (MediaPlayer) @" + proc);
+                    return true;
                 }
             } catch (Throwable t) {
                 logOnce("provider mp fail " + slot.key + ": " + t);
@@ -585,7 +373,7 @@ public final class Hooks {
         return (f != null && f.isFile() && f.length() > 0 && f.canRead()) ? f : null;
     }
 
-    /** 拿到一个可用的 Context：优先系统上下文，其次当前 Application。 */
+    /** 拿到一个可用的 Context：优先 Application，其次系统上下文。 */
     static Context context() {
         Context c = appCtx;
         if (c != null) {
@@ -596,10 +384,6 @@ public final class Hooks {
             if (c != null) {
                 return c;
             }
-            if (ctxTries >= 3) {
-                return null;
-            }
-            ctxTries++;
             try {
                 Class<?> at = Class.forName("android.app.ActivityThread");
                 Object thread = callStatic(at, "currentActivityThread");
@@ -652,30 +436,7 @@ public final class Hooks {
         }
     }
 
-    /** 把关键事件回写到 App 的日志区，方便在手机上排查。 */
-    private static void push(String msg) {
-        log(msg);
-        long now = System.currentTimeMillis();
-        if (now - lastPush < 500) {
-            return;
-        }
-        lastPush = now;
-        if ("android".equals(proc)) {
-            return;
-        }
-        Context c = appCtx != null ? appCtx : context();
-        if (c == null) {
-            return;
-        }
-        try {
-            ContentValues v = new ContentValues();
-            v.put("line", "[" + proc + "] " + msg);
-            c.getContentResolver().insert(Uri.parse("content://com.hypersound.mod.sounds/log"), v);
-        } catch (Throwable ignored) {
-        }
-    }
-
-    /** 注入状态：拿不到 appCtx 时也尽量回写一次，App 用它显示作用域是否生效。 */
+    /** 注入状态：回写到 App 日志。 */
     private static void status(String msg) {
         log(msg);
         Context c = appCtx != null ? appCtx : context();
@@ -690,29 +451,7 @@ public final class Hooks {
         }
     }
 
-    private static boolean looksAudio(String name) {
-        String s = name.toLowerCase();
-        return s.endsWith(".ogg") || s.endsWith(".mp3") || s.endsWith(".wav") || s.endsWith(".m4a") || s.endsWith(".flac");
-    }
-
-    /** 音效被系统请求且识别出槽位，但用户还没设置自定义音：记一条，便于自检覆盖率。 */
-    private static void seen(Slots.Slot slot) {
-        if (once.size() > 200 || !once.add("seen:" + slot.key)) {
-            return;
-        }
-        log("seen " + slot.key);
-        Context c = appCtx != null ? appCtx : context();
-        if (c == null) {
-            return;
-        }
-        try {
-            ContentValues v = new ContentValues();
-            v.put("line", "seen " + slot.key + "  @" + proc);
-            c.getContentResolver().insert(Uri.parse("content://com.hypersound.mod.sounds/log"), v);
-        } catch (Throwable ignored) {
-        }
-    }
-    /** 系统请求了但没匹配到槽位的音效名，回写到 App 日志（去重）。 */
+    /** 系统请求了但没匹配到槽位的音效名。 */
     private static void miss(String path) {
         String base = path;
         int slash = path.lastIndexOf(47);
@@ -733,6 +472,53 @@ public final class Hooks {
         try {
             ContentValues v = new ContentValues();
             v.put("line", "miss: " + base + "  @" + proc);
+            c.getContentResolver().insert(Uri.parse("content://com.hypersound.mod.sounds/log"), v);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    /** 识别出槽位但还没设置自定义音。 */
+    private static void seen(Slots.Slot slot) {
+        if (once.size() > 200 || !once.add("seen:" + slot.key)) {
+            return;
+        }
+        log("seen " + slot.key);
+        Context c = appCtx != null ? appCtx : context();
+        if (c == null) {
+            return;
+        }
+        try {
+            ContentValues v = new ContentValues();
+            v.put("line", "seen " + slot.key + "  @" + proc);
+            c.getContentResolver().insert(Uri.parse("content://com.hypersound.mod.sounds/log"), v);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static boolean looksAudio(String name) {
+        String s = name.toLowerCase();
+        return s.endsWith(".ogg") || s.endsWith(".mp3") || s.endsWith(".wav")
+                || s.endsWith(".m4a") || s.endsWith(".flac");
+    }
+
+    /** 关键事件回写 App 日志区。 */
+    private static void push(String msg) {
+        log(msg);
+        long now = System.currentTimeMillis();
+        if (now - lastPush < 500) {
+            return;
+        }
+        lastPush = now;
+        if ("android".equals(proc)) {
+            return;
+        }
+        Context c = appCtx != null ? appCtx : context();
+        if (c == null) {
+            return;
+        }
+        try {
+            ContentValues v = new ContentValues();
+            v.put("line", "[" + proc + "] " + msg);
             c.getContentResolver().insert(Uri.parse("content://com.hypersound.mod.sounds/log"), v);
         } catch (Throwable ignored) {
         }

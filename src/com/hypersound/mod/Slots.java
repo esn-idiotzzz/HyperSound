@@ -7,9 +7,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 系统音效槽位表，按 Xiaomi 15 / HyperOS 4.0 (OS4.0.4.0.XOCCNXM) 实际文件校准：
- * /system/media/audio/ui/ 下的真实文件名见每个槽位的 sample。
- * 匹配前会归一化：取文件名、去扩展名、转小写、去掉非字母数字字符。
+ * 系统音效槽位表，按 Xiaomi 15 / HyperOS 4.0 真机实际播放的文件校准。
+ * 只保留已确认有播放者的槽位。
  */
 public final class Slots {
 
@@ -44,27 +43,13 @@ public final class Slots {
     }
 
     static {
-        // 锁屏与解锁
+        // 锁屏与解锁（SystemUI 按路径加载）
         add("lock", "锁屏音", "锁屏与解锁", "Lock.ogg",
                 "lock", "lockscreen", "locksound", "screenlock", "keyguardlock");
         add("unlock", "解锁音", "锁屏与解锁", "Unlock.ogg",
                 "unlock", "unlockscreen", "unlocksound", "screenunlock", "lockscreen_off");
 
-        // 按键与触摸
-        add("effect_tick", "触摸 · 滴答", "按键与触摸", "Effect_Tick.ogg",
-                "effecttick", "tick", "tock");
-        add("key_standard", "按键 · 标准", "按键与触摸", "KeypressStandard.ogg",
-                "keypressstandard", "keystandard", "keyclick", "keypress", "keypressnormal");
-        add("key_space", "按键 · 空格", "按键与触摸", "KeypressSpacebar.ogg",
-                "keypressspacebar", "keyspace", "spacebar");
-        add("key_return", "按键 · 回车", "按键与触摸", "KeypressReturn.ogg",
-                "keypressreturn", "keyreturn", "keyenter");
-        add("key_delete", "按键 · 删除", "按键与触摸", "KeypressDelete.ogg",
-                "keypressdelete", "keydelete", "backspace");
-        add("key_invalid", "按键 · 无效", "按键与触摸", "KeypressInvalid.ogg",
-                "keypressinvalid", "keyinvalid", "keyerror");
-
-        // 充电与电量
+        // 充电与电量（安全中心 MediaPlayer 按路径加载）
         add("charge", "插入充电器", "充电与电量", "charging.ogg",
                 "charging", "charge", "charger", "connectpower", "powerconnect");
         add("charge_wireless", "无线充电", "充电与电量", "charge_wireless.ogg",
@@ -72,34 +57,11 @@ public final class Slots {
         add("disconnect", "拔出充电器", "充电与电量", "disconnect.ogg",
                 "disconnect", "unplug", "powerdisconnect", "chargedisconnect");
         add("low_power", "低电量", "充电与电量", "LowBattery.ogg",
-                "lowbattery", "lowpower", "batterylow", "warning", "warrning",
-                "batterywarning", "criticallowbattery", "normallowbattery");
+                "lowbattery", "lowpower", "batterylow", "warning", "warrning");
 
-        // 截图与相机
-        add("screenshot", "截图", "截图与相机", "screenshot.ogg",
-                "screenshot", "screenshots", "screenshotkr", "capture", "shot", "screenshoot");
-        add("camera", "相机快门", "截图与相机", "camera_click.ogg",
-                "cameraclick", "shutter", "camerasound", "camerashutter");
-        add("camera_focus", "相机对焦", "截图与相机", "camera_focus.ogg",
-                "camerafocus", "autofocus");
-        add("video_record", "开始录像", "截图与相机", "VideoRecord.ogg",
-                "videorecord", "recordstart");
-        add("video_stop", "结束录像", "截图与相机", "VideoStop.ogg",
-                "videostop", "recordstop");
-
-        // 系统提示
-        add("delete_global", "删除提示", "系统提示", "Delete.ogg",
-                "delete", "systemdelete", "globaldelete", "deletesound");
-        add("system_error", "操作失败 / 错误", "系统提示", "SystemError.ogg",
-                "systemerror", "errorhint");
-        add("system_turn_off", "关机提示", "系统提示", "SystemTurnOff.ogg",
-                "systemturnoff", "shutdown", "poweroff", "turnoff");
-        add("flashlight", "手电筒开关", "系统提示", "flashlight.ogg",
-                "flashlight", "torch");
-        add("number_picker", "滚轮调节", "系统提示", "NumberPickerValueChange.ogg",
-                "numberpickervaluechange", "numberpicker");
-        add("music_shake", "摇一摇切歌", "系统提示", "MusicShake.ogg",
-                "musicshake", "shake");
+        // 截图（com.miui.screenshot）
+        add("screenshot", "截图", "截图", "screenshot.ogg",
+                "screenshot", "screenshots", "screenshotkr", "capture", "shot");
 
         // 通话与消息
         add("in_call", "通话提示", "通话与消息", "InCallNotification.ogg",
@@ -111,7 +73,7 @@ public final class Slots {
         add("incoming_message", "新消息", "通话与消息", "IncomingMessage.ogg",
                 "incomingmessage", "newmessage");
 
-        // 铃声类（走 MediaPlayer + Settings；系统设置里也能改，这里方便统一替换）
+        // 铃声与闹钟（MediaPlayer + Settings）
         add("notification", "通知提示音", "铃声与闹钟", "Settings · notification_sound",
                 "notification", "notificationsound", "notify");
         add("alarm", "闹钟铃声", "铃声与闹钟", "Settings · alarm_alert",
@@ -160,26 +122,8 @@ public final class Slots {
         if (n.contains("lock") && !n.contains("clock") && !n.contains("block")) {
             return BY_KEY.get("lock");
         }
-        if (n.contains("cameraclick") || n.contains("shutter")) {
-            return BY_KEY.get("camera");
-        }
-        if (n.contains("video") && (n.contains("end") || n.contains("stop"))) {
-            return BY_KEY.get("video_stop");
-        }
-        if (n.contains("video") && (n.contains("start") || n.contains("record"))) {
-            return BY_KEY.get("video_record");
-        }
-        if (n.contains("camerafastburst") || n.contains("fastburst")) {
-            return BY_KEY.get("camera");
-        }
         if (n.contains("lowbatt")) {
             return BY_KEY.get("low_power");
-        }
-        if (n.contains("systemerror")) {
-            return BY_KEY.get("system_error");
-        }
-        if (n.contains("systemturnoff")) {
-            return BY_KEY.get("system_turn_off");
         }
         if (n.contains("incall")) {
             return BY_KEY.get("in_call");

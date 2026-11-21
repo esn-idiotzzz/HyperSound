@@ -91,6 +91,7 @@ public class MainActivity extends Activity {
             }
         });
 
+        Store.prune(this);
         rebuild();
     }
 
