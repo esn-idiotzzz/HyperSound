@@ -64,16 +64,9 @@ public final class Hooks {
     private Hooks() {
     }
 
+    /** 被 LSPosed 注入的进程都是用户勾选过的，一律安装 hook。 */
     public static boolean isTarget(String pkg) {
-        if (pkg == null) {
-            return false;
-        }
-        for (String t : TARGETS) {
-            if (t.equals(pkg)) {
-                return true;
-            }
-        }
-        return false;
+        return pkg != null && pkg.length() > 0;
     }
 
     public static synchronized void install(XposedModule m, String process, ClassLoader cl) {

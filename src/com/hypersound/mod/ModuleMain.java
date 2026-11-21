@@ -15,9 +15,8 @@ public class ModuleMain extends XposedModule {
     @Override
     public void onPackageLoaded(XposedModuleInterface.PackageLoadedParam param) {
         String pkg = param.getPackageName();
-        if (Hooks.isTarget(pkg)) {
-            Hooks.install(this, pkg, param.getDefaultClassLoader());
-        }
+        // LSPosed 只会注入到已勾选作用域的进程，这里不再用包名白名单过滤。
+        Hooks.install(this, pkg, param.getDefaultClassLoader());
     }
 
     @Override
