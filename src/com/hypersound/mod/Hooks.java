@@ -141,7 +141,14 @@ public final class Hooks {
                             @Override
                             public Object intercept(XposedInterface.Chain chain) throws Throwable {
                                 try {
-                                    probe("playSoundEffect " + chain.getArg(0));
+                                    Object a0 = chain.getArg(0);
+                                    if ("com.android.camera".equals(proc) && a0 instanceof Integer) {
+                                        if (playSlotSound("camera") || playSlotSound("video_record") || playSlotSound("video_stop")) {
+                                            push("替换 camera (playSoundEffect) @" + proc);
+                                            return null;
+                                        }
+                                    }
+                                    probe("playSoundEffect " + a0);
                                 } catch (Throwable ignored) {
                                 }
                                 return chain.proceed();
@@ -191,6 +198,48 @@ public final class Hooks {
         }
     }
 
+    /** 在目标进程里直接播放指定槽位的音频（用于 playSoundEffect 这类没有文件名的调用）。 */
+    private static boolean playSlotSound(String key) {
+        Context c = context();
+        if (c == null) {
+            return false;
+        }
+        try {
+            if (!Cfg.get(c).has(key)) {
+                return false;
+            }
+        } catch (Throwable t) {
+            return false;
+        }
+        File m = mirrorFile(key);
+        if (m == null) {
+            return false;
+        }
+        try {
+            final MediaPlayer mp = new MediaPlayer();
+            android.media.AudioAttributes attrs = new android.media.AudioAttributes.Builder()
+                    .setUsage(android.media.AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+                    .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build();
+            mp.setAudioAttributes(attrs);
+            mp.setDataSource(m.getAbsolutePath());
+            mp.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
+                @Override
+                public void onCompletion(MediaPlayer x) {
+                    try {
+                        x.release();
+                    } catch (Throwable ignored) {
+                    }
+                }
+            });
+            mp.prepare();
+            mp.start();
+            return true;
+        } catch (Throwable t) {
+            logOnce("playSlot " + key + " fail: " + t);
+            return false;
+        }
+    }
     private static void probe(String msg) {
         if (once.size() > 300 || !once.add("probe:" + msg)) {
             return;

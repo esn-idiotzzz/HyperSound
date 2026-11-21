@@ -32,7 +32,6 @@ public class MainActivity extends Activity {
     private TextView tabModified;
     private TextView empty;
     private TextView btnApply;
-    private TextView tvStatus;
     private Adapter adapter;
     private MediaPlayer player;
     private String pendingKey;
@@ -49,13 +48,6 @@ public class MainActivity extends Activity {
         tabModified = (TextView) findViewById(R.id.tab_modified);
         empty = (TextView) findViewById(R.id.tv_empty);
         btnApply = (TextView) findViewById(R.id.btn_apply);
-        tvStatus = (TextView) findViewById(R.id.tv_status);
-        tvStatus.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                showInjectionDialog();
-            }
-        });
 
         btnApply.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -150,9 +142,6 @@ public class MainActivity extends Activity {
         boolean pending = Store.version(this) != Store.appliedVersion(this);
         btnApply.setText(getString(pending ? R.string.apply_pending : R.string.apply));
         btnApply.setAlpha(pending ? 1f : 0.82f);
-
-        updateInjectionStatus();
-
         boolean blank = items.isEmpty();
         empty.setVisibility(blank ? View.VISIBLE : View.GONE);
         list.setVisibility(blank ? View.GONE : View.VISIBLE);
@@ -165,68 +154,6 @@ public class MainActivity extends Activity {
         }
     }
 
-    private static final String[] KEY_PKGS = {
-            "com.android.systemui",
-            "android",
-            "com.miui.securitycenter",
-            "com.android.camera",
-            "com.android.mms",
-            "com.android.incallui",
-            "com.android.settings",
-            "com.miui.home",
-    };
-
-    private static final String[] KEY_LABELS = {
-            "系统界面",
-            "系统框架",
-            "安全中心（充电音）",
-            "相机",
-            "短信",
-            "通话界面",
-            "设置",
-            "桌面",
-    };
-
-    private void updateInjectionStatus() {
-        String log = Store.readLog(this);
-        int ok = 0;
-        for (String p : KEY_PKGS) {
-            if (log.indexOf("installed in " + p) >= 0) {
-                ok++;
-            }
-        }
-        boolean hasSysUi = log.indexOf("installed in com.android.systemui") >= 0;
-        if (!hasSysUi) {
-            tvStatus.setText("未检测到注入：请在 LSPosed 勾选「系统界面」后重启");
-            tvStatus.setTextColor(0xFFFF8A80);
-        } else if (ok == KEY_PKGS.length) {
-            tvStatus.setText("注入状态：8/8 个关键进程已生效 · 点击查看");
-            tvStatus.setTextColor(0xFF6FD08C);
-        } else {
-            tvStatus.setText("已注入 " + ok + "/8 · 其余 App 启动后自动生效 · 点击查看");
-            tvStatus.setTextColor(0xFFFFB86B);
-        }
-    }
-
-    private void showInjectionDialog() {
-        String log = Store.readLog(this);
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < KEY_PKGS.length; i++) {
-            boolean ok = log.indexOf("installed in " + KEY_PKGS[i]) >= 0;
-            sb.append(ok ? "\u2713 " : "\u25cb ").append(KEY_LABELS[i]);
-            if (!ok) {
-                sb.append("（打开对应 App 后自动生效）");
-            }
-            sb.append('\n');
-        }
-        sb.append("\n○ 不是故障：该 App 还没启动过，打开它（或拍照/收消息/插充电器）时会自动注入。");
-        sb.append("\n充电/无线充/拔出提示音由「安全中心」播放，必须勾选它。");
-        new AlertDialog.Builder(this)
-                .setTitle("注入状态")
-                .setMessage(sb.toString())
-                .setPositiveButton("知道了", null)
-                .show();
-    }
     private void styleTab(TextView tv, boolean on) {
         tv.setBackgroundResource(on ? R.drawable.bg_tab_on : R.drawable.bg_tab_off);
         tv.setTextColor(on ? 0xFF08131F : 0xFF8A96A8);
