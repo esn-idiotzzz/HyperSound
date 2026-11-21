@@ -283,6 +283,10 @@ public final class Hooks {
         if (c != null) {
             AssetFileDescriptor afd = null;
             try {
+                if (!Cfg.get(c).has(slot.key)) {
+                    seen(slot);
+                    return null;
+                }
                 if (Cfg.get(c).has(slot.key)) {
                     afd = c.getContentResolver().openAssetFileDescriptor(Cfg.uriSound(slot.key), "r");
                     if (afd != null) {
@@ -340,6 +344,10 @@ public final class Hooks {
         if (c != null) {
             AssetFileDescriptor afd = null;
             try {
+                if (!Cfg.get(c).has(slot.key)) {
+                    seen(slot);
+                    return false;
+                }
                 if (Cfg.get(c).has(slot.key)) {
                     afd = c.getContentResolver().openAssetFileDescriptor(Cfg.uriSound(slot.key), "r");
                     if (afd != null) {
@@ -518,6 +526,23 @@ public final class Hooks {
         return s.endsWith(".ogg") || s.endsWith(".mp3") || s.endsWith(".wav") || s.endsWith(".m4a") || s.endsWith(".flac");
     }
 
+    /** 音效被系统请求且识别出槽位，但用户还没设置自定义音：记一条，便于自检覆盖率。 */
+    private static void seen(Slots.Slot slot) {
+        if (once.size() > 200 || !once.add("seen:" + slot.key)) {
+            return;
+        }
+        log("seen " + slot.key);
+        Context c = appCtx != null ? appCtx : context();
+        if (c == null) {
+            return;
+        }
+        try {
+            ContentValues v = new ContentValues();
+            v.put("line", "seen " + slot.key + "  @" + proc);
+            c.getContentResolver().insert(Uri.parse("content://com.hypersound.mod.sounds/log"), v);
+        } catch (Throwable ignored) {
+        }
+    }
     /** 系统请求了但没匹配到槽位的音效名，回写到 App 日志（去重）。 */
     private static void miss(String path) {
         String base = path;

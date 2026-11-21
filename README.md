@@ -46,6 +46,21 @@
 匹配规则：把「文件名 / 资源名」归一化（去路径、去扩展名、转小写、去非字母数字）后精确比对。
 `/system/media/audio/ui/Lock.ogg`、`/product/media/audio/ui/Lock.ogg`、`file:///.../Lock.ogg`、资源名 `lock` 都能命中。
 
+## 各音效由哪个进程播放（真机核对）
+
+| 音效 | 播放进程 | 是否在推荐作用域 |
+|---|---|---|
+| 锁屏 / 解锁 | `com.android.systemui` | ✅ |
+| 触摸滴答 / 按键音 | `android`（system_server AudioService，`Effect_Tick.ogg`） | ✅ |
+| **插入充电 / 无线充 / 拔出** | **`com.miui.securitycenter`（安全中心）** | ✅（v1.6 起加入推荐，需手动勾选） |
+| 截图 | `com.miui.screenshot`（`screenshot.ogg`） | ✅ |
+| 删除提示 / 消息已发送 | `com.android.mms`（`Delete.ogg`、`MessageSent.ogg`） | ✅ |
+| 摇一摇切歌 | `com.android.settings`（`MusicShake.ogg`） | ✅ |
+| 通话提示 | `com.android.systemui`（`InCallNotification.ogg`） | ✅ |
+| 相机快门/对焦/录像 | `com.android.camera` | ✅ |
+| 通知/闹钟/铃声 | 各 App + `MediaPlayer` | ✅ |
+
+> **充电三项音效必须勾选「安全中心」**，否则永远不会生效——这是实测最容易漏的一项。
 ## 安装与使用
 
 1. 安装 `HyperSound-1.4.apk`（普通安装，不要转成系统应用）。
