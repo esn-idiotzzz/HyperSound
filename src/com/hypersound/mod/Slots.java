@@ -61,8 +61,6 @@ public final class Slots {
 
         add("message_sent", "消息已发送", "消息", "MessageSent.ogg",
                 "messagesent", "messagesendout", "messagesentout");
-        add("incoming_message", "新消息", "消息", "IncomingMessage.ogg",
-                "incomingmessage", "newmessage");
         add("notification", "通知提示音（短信/通知）", "通知", "Settings · notification_sound",
                 "notification", "notificationsound", "notify");
 
@@ -110,9 +108,6 @@ public final class Slots {
         }
         if (n.contains("lowbatt")) {
             return BY_KEY.get("low_power");
-        }
-        if (n.contains("incomingmessage")) {
-            return BY_KEY.get("incoming_message");
         }
         if (n.contains("messagesent") || n.contains("messagesendout")) {
             return BY_KEY.get("message_sent");
