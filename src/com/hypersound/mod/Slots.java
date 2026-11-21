@@ -163,11 +163,14 @@ public final class Slots {
         if (n.contains("cameraclick") || n.contains("shutter")) {
             return BY_KEY.get("camera");
         }
-        if (n.contains("videorecord")) {
+        if (n.contains("video") && (n.contains("end") || n.contains("stop"))) {
+            return BY_KEY.get("video_stop");
+        }
+        if (n.contains("video") && (n.contains("start") || n.contains("record"))) {
             return BY_KEY.get("video_record");
         }
-        if (n.contains("videostop")) {
-            return BY_KEY.get("video_stop");
+        if (n.contains("camerafastburst") || n.contains("fastburst")) {
+            return BY_KEY.get("camera");
         }
         if (n.contains("lowbatt")) {
             return BY_KEY.get("low_power");

@@ -203,7 +203,7 @@ public class MainActivity extends Activity {
             tvStatus.setText("注入状态：8/8 个关键进程已生效 · 点击查看");
             tvStatus.setTextColor(0xFF6FD08C);
         } else {
-            tvStatus.setText("注入状态：" + ok + "/8 个关键进程 · 点击查看缺哪些");
+            tvStatus.setText("已注入 " + ok + "/8 个进程（其余在对应 App 启动后生效）· 点击查看");
             tvStatus.setTextColor(0xFFFFB86B);
         }
     }
@@ -219,7 +219,7 @@ public class MainActivity extends Activity {
             }
             sb.append('\n');
         }
-        sb.append("\n✗ 表示该进程还没被注入：在 LSPosed 作用域里勾选对应应用，重启后生效。");
+        sb.append("\n✗ 表示该进程还没启动或还没触发（不是故障）。对应 App 启动后会自动注入。");
         sb.append("\n充电/无线充/拔出提示音由「安全中心」播放，必须勾选它。");
         new AlertDialog.Builder(this)
                 .setTitle("注入状态")

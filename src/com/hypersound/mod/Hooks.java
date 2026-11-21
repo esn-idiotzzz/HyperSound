@@ -39,6 +39,9 @@ public final class Hooks {
 
     private static long lastPush;
     private static final ThreadLocal<Boolean> REPLACING = new ThreadLocal<Boolean>();
+    /** 资源方式加载的音效：AssetFileDescriptor -> 槽位（相机等 App 用 assets 播放）。 */
+    private static final java.util.Map<Object, Slots.Slot> AFD_MAP =
+            java.util.Collections.synchronizedMap(new java.util.WeakHashMap<Object, Slots.Slot>());
     private static final Set<String> once = Collections.synchronizedSet(new HashSet<String>());
 
     private static volatile Map<String, File> mirrorCache;
@@ -83,6 +86,7 @@ public final class Hooks {
             int loads = hookSoundPool();
             int mps = hookMediaPlayer();
             hookAppContext();
+            hookAssets();
             installed = true;
             log("installed in " + process + " (SoundPool.load=" + loads + ", MediaPlayer=" + mps + ")");
             status("installed in " + process);
@@ -129,6 +133,46 @@ public final class Hooks {
         return n;
     }
 
+    /** 相机等 App 通过 AssetManager 打开 assets 里的音频，这里记录名字与 AFD 的对应关系。 */
+    private static void hookAssets() {
+        try {
+            Class<?> am = android.content.res.AssetManager.class;
+            for (Method m : am.getDeclaredMethods()) {
+                String n = m.getName();
+                if (!"openFd".equals(n) && !"openNonAssetFd".equals(n)) {
+                    continue;
+                }
+                Class<?>[] pt = m.getParameterTypes();
+                if (pt.length != 1 || pt[0] != String.class) {
+                    continue;
+                }
+                module.hook(m)
+                        .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
+                        .intercept(new AssetHook());
+            }
+            log("AssetManager hooks installed");
+        } catch (Throwable t) {
+            log("hookAssets failed: " + t);
+        }
+    }
+
+    private static final class AssetHook implements XposedInterface.Hooker {
+        @Override
+        public Object intercept(XposedInterface.Chain chain) throws Throwable {
+            Object r = chain.proceed();
+            try {
+                Object name = chain.getArg(0);
+                if (r instanceof android.content.res.AssetFileDescriptor && name instanceof String) {
+                    Slots.Slot s = Slots.match((String) name);
+                    if (s != null) {
+                        AFD_MAP.put(r, s);
+                    }
+                }
+            } catch (Throwable ignored) {
+            }
+            return r;
+        }
+    }
     /** 尽早拿到 Application 的 Context，供没有 Context 参数的 load(String) 使用。 */
     private static void hookAppContext() {
         try {
@@ -210,6 +254,8 @@ public final class Hooks {
                     if (slot == null && path.indexOf("/audio/") >= 0) {
                         miss(path);
                     }
+                } else if (a0 instanceof android.content.res.AssetFileDescriptor) {
+                    slot = AFD_MAP.get(a0);
                 } else if (a0 instanceof Context) {
                     Context c = (Context) a0;
                     if (appCtx == null) {
