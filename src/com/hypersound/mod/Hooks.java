@@ -224,9 +224,17 @@ public final class Hooks {
         try {
             android.content.ContentResolver cr = c.getContentResolver();
 
+            String ring = Settings.System.getString(cr, Settings.System.RINGTONE);
+            if (ring != null && ring.equals(s)) {
+                return Slots.byKey("ringtone");
+            }
             String notify = Settings.System.getString(cr, "notification_sound");
             if (notify != null && notify.equals(s)) {
                 return Slots.byKey("notification");
+            }
+            String alarm = Settings.System.getString(cr, "alarm_alert");
+            if (alarm != null && alarm.equals(s)) {
+                return Slots.byKey("alarm");
             }
             String chg = Settings.Global.getString(cr, "charging_started_sound");
             if (chg != null && chg.equals(s)) {

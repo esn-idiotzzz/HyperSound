@@ -6,9 +6,9 @@
 - 包名：`com.hypersound.mod`，模块名 `HyperSound`，版本 4.0
 - 框架：LSPosed（libxposed API 101）
 - 校准机型：Xiaomi 15（`24129PN74C`），HyperOS `OS4.0.4.0.XOCCNXM`，API 37
-- 只保留真机上**已确认有播放者**的 9 个音效
+- 只保留真机上**已确认有播放者**的 11 个音效
 
-## 支持的音效（9 项）
+## 支持的音效（11 项）
 
 | 分组 | 音效 | 系统文件 | 播放进程 |
 |---|---|---|---|
@@ -30,6 +30,8 @@ com.android.systemui        锁屏 / 解锁 / 通知
 com.miui.securitycenter     充电 / 无线充 / 拔出
 com.miui.screenshot         截图
 com.android.mms             消息
+com.android.deskclock       闹钟
+com.android.incallui        来电铃声
 ```
 
 ## 已移除的槽位（真机上无播放者或无法区分）

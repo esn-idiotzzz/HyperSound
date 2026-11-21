@@ -63,6 +63,10 @@ public final class Slots {
                 "messagesent", "messagesendout", "messagesentout");
         add("notification", "通知提示音（短信/通知）", "通知", "Settings · notification_sound",
                 "notification", "notificationsound", "notify");
+        add("ringtone", "来电铃声", "铃声与通知", "Settings · ringtone",
+                "ringtone", "miuiweekringtone");
+        add("alarm", "闹钟铃声", "铃声与通知", "Settings · alarm_alert",
+                "alarm", "alarmsound", "alarmalert", "dynamicalarmspeech");
 
     }
 
