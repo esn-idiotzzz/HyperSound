@@ -385,12 +385,28 @@ public class MainActivity extends Activity {
         return n;
     }
 
+    private static final String[] SU_PATHS = {
+            "/system/bin/su", "/system/xbin/su", "/debug_ramdisk/su", "/sbin/su", "su"
+    };
+
+    /** 应用改动时需要重启的进程：杀掉后系统/下次打开会自动重新注入。 */
+    private static final String[] RESTART_PKGS = {
+            "com.android.systemui",
+            "com.miui.securitycenter",
+            "com.miui.screenshot",
+            "com.android.camera",
+            "com.android.mms",
+            "com.android.settings",
+            "com.miui.powerkeeper",
+            "com.android.deskclock",
+    };
+
     private void doApply() {
         boolean pending = Store.version(this) != Store.appliedVersion(this);
         if (!pending) {
             new AlertDialog.Builder(this)
                     .setTitle("没有未应用的更改")
-                    .setMessage("仍要重启系统界面吗？")
+                    .setMessage("仍要重启相关进程吗？")
                     .setNegativeButton("取消", null)
                     .setPositiveButton("重启", new DialogInterface.OnClickListener() {
                         @Override
@@ -405,18 +421,18 @@ public class MainActivity extends Activity {
     }
 
     private void restartSystemUi() {
-        toast("正在重启系统界面…");
+        toast("正在重启相关进程…");
         new Thread(new Runnable() {
             @Override
             public void run() {
-                final boolean ok = killSystemUi();
+                final int n = killTargets();
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-                        if (ok) {
+                        if (n > 0) {
                             Store.setAppliedVersion(MainActivity.this, Store.version(MainActivity.this));
                             rebuild();
-                            toast("系统界面已重启，锁屏/解锁等音效已生效");
+                            toast("已重启 " + n + " 个进程并刷新系统音效");
                         } else {
                             showApplyHelp();
                         }
@@ -426,28 +442,70 @@ public class MainActivity extends Activity {
         }).start();
     }
 
-    private boolean killSystemUi() {
-        String[] suPaths = {"/system/bin/su", "/system/xbin/su", "/debug_ramdisk/su", "/sbin/su", "su"};
-        String[] cmds = {
-                "killall com.android.systemui",
-                "pkill -f com.android.systemui",
-                "kill $(pidof com.android.systemui)",
-        };
-        for (String su : suPaths) {
-            for (String cmd : cmds) {
-                try {
-                    Process p = new ProcessBuilder(su, "-c", cmd).redirectErrorStream(true).start();
-                    if (p.waitFor() == 0) {
-                        sleep(800);
-                        return true;
-                    }
-                } catch (Throwable ignored) {
+    /** 按进程名精确匹配，杀掉所有相关进程，返回杀掉的个数。 */
+    private int killTargets() {
+        String ps = suRun("ps -A -o PID,NAME");
+        java.util.List<String> pids = new java.util.ArrayList<String>();
+        java.util.Set<String> hitPkgs = new java.util.HashSet<String>();
+        for (String line : ps.split("\n")) {
+            String[] parts = line.trim().split("\\s+");
+            if (parts.length < 2 || !parts[0].matches("\\d+")) {
+                continue;
+            }
+            String name = parts[1];
+            for (String pkg : RESTART_PKGS) {
+                if (name.equals(pkg) || name.startsWith(pkg + ".") || name.startsWith(pkg + ":")) {
+                    pids.add(parts[0]);
+                    hitPkgs.add(pkg);
+                    break;
                 }
             }
         }
-        return false;
+        if (pids.isEmpty()) {
+            suRun("killall com.android.systemui");
+            return 1;
+        }
+        StringBuilder cmd = new StringBuilder("kill");
+        for (String pid : pids) {
+            cmd.append(' ').append(pid);
+        }
+        suRun(cmd.toString());
+        reloadSoundEffects();
+        sleep(1200);
+        return hitPkgs.size();
     }
 
+    /** 让 system_server 的 AudioService 重新加载音效（按键/触摸音），无需重启手机。 */
+    private void reloadSoundEffects() {
+        String cur = suRun("settings get system sound_effects_enabled").trim();
+        if (!"1".equals(cur)) {
+            return;
+        }
+        suRun("settings put system sound_effects_enabled 0");
+        sleep(400);
+        suRun("settings put system sound_effects_enabled 1");
+        sleep(400);
+    }
+    private String suRun(String cmd) {
+        for (String su : SU_PATHS) {
+            try {
+                Process p = new ProcessBuilder(su, "-c", cmd).redirectErrorStream(true).start();
+                java.io.BufferedReader r = new java.io.BufferedReader(
+                        new java.io.InputStreamReader(p.getInputStream()));
+                StringBuilder sb = new StringBuilder();
+                String line;
+                while ((line = r.readLine()) != null) {
+                    sb.append(line).append('\n');
+                }
+                int code = p.waitFor();
+                if (code == 0 || sb.length() > 0) {
+                    return sb.toString();
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+        return "";
+    }
     private static void sleep(long ms) {
         try {
             Thread.sleep(ms);

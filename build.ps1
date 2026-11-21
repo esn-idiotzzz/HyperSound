@@ -3,7 +3,7 @@ param(
     [string]$Sdk  = 'C:\Users\joe\Desktop\dhwork\sdk',
     [string]$Libx = 'C:\Users\joe\Desktop\dhwork\libx\classes.jar',
     [string]$OutDir = '',
-    [string]$OutName = 'HyperSound-2.2.apk'
+    [string]$OutName = 'HyperSound-2.3.apk'
 )
 $ErrorActionPreference = 'Stop'
 
@@ -40,7 +40,7 @@ Write-Host '== aapt2 compile =='
 if ($LASTEXITCODE -ne 0) { throw 'aapt2 compile failed' }
 
 Write-Host '== aapt2 link =='
-& $aapt2 link -o (Join-Path $build 'base.apk') -I $plat --manifest (Join-Path $Root 'AndroidManifest.xml') -R (Join-Path $build 'res.zip') --auto-add-overlay --java $gen --min-sdk-version 29 --target-sdk-version 34 --version-code 13 --version-name 2.2
+& $aapt2 link -o (Join-Path $build 'base.apk') -I $plat --manifest (Join-Path $Root 'AndroidManifest.xml') -R (Join-Path $build 'res.zip') --auto-add-overlay --java $gen --min-sdk-version 29 --target-sdk-version 34 --version-code 14 --version-name 2.3
 if ($LASTEXITCODE -ne 0) { throw 'aapt2 link failed' }
 
 Write-Host '== javac =='
