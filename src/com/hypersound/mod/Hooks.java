@@ -38,6 +38,7 @@ public final class Hooks {
     private static boolean installed;
 
     private static long lastPush;
+    private static final ThreadLocal<Boolean> REPLACING = new ThreadLocal<Boolean>();
     private static final Set<String> once = Collections.synchronizedSet(new HashSet<String>());
 
     private static volatile Map<String, File> mirrorCache;
@@ -156,6 +157,9 @@ public final class Hooks {
     private static final class LoadHook implements XposedInterface.Hooker {
         @Override
         public Object intercept(XposedInterface.Chain chain) throws Throwable {
+            if (Boolean.TRUE.equals(REPLACING.get())) {
+                return chain.proceed();
+            }
             try {
                 Object a0 = chain.getArg(0);
                 Slots.Slot slot = null;
@@ -194,6 +198,9 @@ public final class Hooks {
     private static final class PlayerHook implements XposedInterface.Hooker {
         @Override
         public Object intercept(XposedInterface.Chain chain) throws Throwable {
+            if (Boolean.TRUE.equals(REPLACING.get())) {
+                return chain.proceed();
+            }
             try {
                 Object a0 = chain.getArg(0);
                 Slots.Slot slot = null;
@@ -276,7 +283,13 @@ public final class Hooks {
                 if (Cfg.get(c).has(slot.key)) {
                     afd = c.getContentResolver().openAssetFileDescriptor(Cfg.uriSound(slot.key), "r");
                     if (afd != null) {
-                        int id = ((SoundPool) pool).load(afd, 1);
+                        int id;
+                        REPLACING.set(Boolean.TRUE);
+                        try {
+                            id = ((SoundPool) pool).load(afd, 1);
+                        } finally {
+                            REPLACING.remove();
+                        }
                         if (id > 0) {
                             push("替换 " + slot.key + " → id=" + id + " @" + proc);
                             return Integer.valueOf(id);
@@ -301,7 +314,13 @@ public final class Hooks {
         File m = mirrorFile(slot.key);
         if (m != null) {
             try {
-                int id = ((SoundPool) pool).load(m.getAbsolutePath(), 1);
+                int id;
+                REPLACING.set(Boolean.TRUE);
+                try {
+                    id = ((SoundPool) pool).load(m.getAbsolutePath(), 1);
+                } finally {
+                    REPLACING.remove();
+                }
                 if (id > 0) {
                     push("替换 " + slot.key + " (path) → id=" + id + " @" + proc);
                     return Integer.valueOf(id);
@@ -321,8 +340,13 @@ public final class Hooks {
                 if (Cfg.get(c).has(slot.key)) {
                     afd = c.getContentResolver().openAssetFileDescriptor(Cfg.uriSound(slot.key), "r");
                     if (afd != null) {
-                        ((MediaPlayer) mp).setDataSource(afd.getFileDescriptor(),
-                                afd.getStartOffset(), afd.getLength());
+                        REPLACING.set(Boolean.TRUE);
+                        try {
+                            ((MediaPlayer) mp).setDataSource(afd.getFileDescriptor(),
+                                    afd.getStartOffset(), afd.getLength());
+                        } finally {
+                            REPLACING.remove();
+                        }
                         push("替换 " + slot.key + " (MediaPlayer) @" + proc);
                         return true;
                     }
@@ -343,7 +367,12 @@ public final class Hooks {
         File m = mirrorFile(slot.key);
         if (m != null) {
             try {
-                ((MediaPlayer) mp).setDataSource(m.getAbsolutePath());
+                REPLACING.set(Boolean.TRUE);
+                try {
+                    ((MediaPlayer) mp).setDataSource(m.getAbsolutePath());
+                } finally {
+                    REPLACING.remove();
+                }
                 push("替换 " + slot.key + " (MediaPlayer/path) @" + proc);
                 return true;
             } catch (Throwable t) {
@@ -373,7 +402,7 @@ public final class Hooks {
             mirrorAt = now;
         }
         File f = m.get(key);
-        return (f != null && f.isFile() && f.length() > 0) ? f : null;
+        return (f != null && f.isFile() && f.length() > 0 && f.canRead()) ? f : null;
     }
 
     /** 拿到一个可用的 Context：优先系统上下文，其次当前 Application。 */
