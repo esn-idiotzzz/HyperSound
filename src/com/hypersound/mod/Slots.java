@@ -133,7 +133,64 @@ public final class Slots {
         if (n == null || n.length() == 0) {
             return null;
         }
-        return BY_NAME.get(n);
+        Slot s = BY_NAME.get(n);
+        if (s != null) {
+            return s;
+        }
+        return fuzzy(n);
+    }
+
+    /** 命名变体兜底：按关键字族匹配，避免系统改名后漏掉。 */
+    private static Slot fuzzy(String n) {
+        if (n.contains("wirelesscharg")) {
+            return BY_KEY.get("charge_wireless");
+        }
+        if (n.contains("unplug") || n.contains("disconnect")) {
+            return BY_KEY.get("disconnect");
+        }
+        if (n.contains("charg")) {
+            return BY_KEY.get("charge");
+        }
+        if (n.contains("screenshot") || n.contains("screencapture")) {
+            return BY_KEY.get("screenshot");
+        }
+        if (n.contains("unlock")) {
+            return BY_KEY.get("unlock");
+        }
+        if (n.contains("lock") && !n.contains("clock") && !n.contains("block")) {
+            return BY_KEY.get("lock");
+        }
+        if (n.contains("cameraclick") || n.contains("shutter")) {
+            return BY_KEY.get("camera");
+        }
+        if (n.contains("videorecord")) {
+            return BY_KEY.get("video_record");
+        }
+        if (n.contains("videostop")) {
+            return BY_KEY.get("video_stop");
+        }
+        if (n.contains("lowbatt")) {
+            return BY_KEY.get("low_power");
+        }
+        if (n.contains("systemerror")) {
+            return BY_KEY.get("system_error");
+        }
+        if (n.contains("systemturnoff")) {
+            return BY_KEY.get("system_turn_off");
+        }
+        if (n.contains("incall")) {
+            return BY_KEY.get("in_call");
+        }
+        if (n.contains("incomingmessage")) {
+            return BY_KEY.get("incoming_message");
+        }
+        if (n.contains("messagesending")) {
+            return BY_KEY.get("message_sending");
+        }
+        if (n.contains("messagesent") || n.contains("messagesendout")) {
+            return BY_KEY.get("message_sent");
+        }
+        return null;
     }
 
     /** 取文件名、去扩展名、小写、只保留字母数字。 */

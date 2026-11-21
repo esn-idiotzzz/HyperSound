@@ -218,6 +218,9 @@ public final class Hooks {
                     Object a1 = chain.getArgs().size() > 1 ? chain.getArg(1) : null;
                     if (a1 instanceof Uri) {
                         slot = matchUri(c, (Uri) a1);
+                        if (slot == null) {
+                            miss(a1.toString());
+                        }
                     }
                 }
                 if (slot != null) {
@@ -483,7 +486,7 @@ public final class Hooks {
         if ("android".equals(proc)) {
             return;
         }
-        Context c = appCtx;
+        Context c = appCtx != null ? appCtx : context();
         if (c == null) {
             return;
         }
@@ -510,12 +513,20 @@ public final class Hooks {
         }
     }
 
+    private static boolean looksAudio(String name) {
+        String s = name.toLowerCase();
+        return s.endsWith(".ogg") || s.endsWith(".mp3") || s.endsWith(".wav") || s.endsWith(".m4a") || s.endsWith(".flac");
+    }
+
     /** 系统请求了但没匹配到槽位的音效名，回写到 App 日志（去重）。 */
     private static void miss(String path) {
         String base = path;
         int slash = path.lastIndexOf(47);
         if (slash >= 0) {
             base = path.substring(slash + 1);
+        }
+        if (!looksAudio(base)) {
+            return;
         }
         if (once.size() > 200 || !once.add("miss:" + base)) {
             return;

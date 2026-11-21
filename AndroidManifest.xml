@@ -25,6 +25,7 @@
         <provider
             android:name=".SoundProvider"
             android:authorities="com.hypersound.mod.sounds"
+            android:directBootAware="true"
             android:exported="true"
             android:grantUriPermissions="false" />
     </application>

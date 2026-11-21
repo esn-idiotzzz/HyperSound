@@ -26,8 +26,17 @@ public final class Store {
     private Store() {
     }
 
+    /** 设备加密存储：开机解锁前也可用，SystemUI 启动早期就能读到。 */
+    static Context de(Context c) {
+        try {
+            return c.createDeviceProtectedStorageContext();
+        } catch (Throwable t) {
+            return c;
+        }
+    }
+
     public static File dir(Context c) {
-        File d = new File(c.getFilesDir(), "sounds");
+        File d = new File(de(c).getFilesDir(), "sounds");
         if (!d.exists()) {
             //noinspection ResultOfMethodCallIgnored
             d.mkdirs();
@@ -35,8 +44,64 @@ public final class Store {
         return d;
     }
 
+    private static volatile boolean migrated;
+
     public static SharedPreferences prefs(Context c) {
-        return c.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        SharedPreferences p = de(c).getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        if (!migrated) {
+            migrated = true;
+            try {
+                migrate(c, p);
+            } catch (Throwable ignored) {
+            }
+        }
+        return p;
+    }
+
+    /** 老版本数据在凭据加密存储里，升级后一次性搬到设备加密存储。 */
+    private static void migrate(Context c, SharedPreferences dePrefs) {
+        if (dePrefs.getBoolean("migrated", false)) {
+            return;
+        }
+        SharedPreferences ce = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        SharedPreferences.Editor e = dePrefs.edit();
+        for (java.util.Map.Entry<String, ?> en : ce.getAll().entrySet()) {
+            Object v = en.getValue();
+            if (v instanceof String) {
+                e.putString(en.getKey(), (String) v);
+            } else if (v instanceof Integer) {
+                e.putInt(en.getKey(), (Integer) v);
+            } else if (v instanceof Boolean) {
+                e.putBoolean(en.getKey(), (Boolean) v);
+            }
+        }
+        try {
+            File from = new File(c.getFilesDir(), "sounds");
+            File to = new File(de(c).getFilesDir(), "sounds");
+            if (!to.exists()) {
+                to.mkdirs();
+            }
+            File[] fs = from.listFiles();
+            if (fs != null) {
+                for (File src : fs) {
+                    File dst = new File(to, src.getName());
+                    if (dst.exists()) {
+                        continue;
+                    }
+                    FileInputStream in = new FileInputStream(src);
+                    FileOutputStream out = new FileOutputStream(dst);
+                    byte[] buf = new byte[65536];
+                    int n;
+                    while ((n = in.read(buf)) > 0) {
+                        out.write(buf, 0, n);
+                    }
+                    out.close();
+                    in.close();
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        e.putBoolean("migrated", true).apply();
     }
 
 
@@ -367,7 +432,7 @@ public final class Store {
     }
 
     private static File logFile(Context c) {
-        return new File(c.getFilesDir(), "hook.log");
+        return new File(de(c).getFilesDir(), "hook.log");
     }
 
     public static synchronized void appendLog(Context c, String line) {
