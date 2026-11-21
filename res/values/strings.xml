@@ -3,8 +3,10 @@
     <string name="app_name">澎湃音效</string>
     <string name="subtitle">HyperOS 4 · 30 项系统音效</string>
     <string name="apply">应用更改</string>
+    <string name="apply_pending">应用更改 •</string>
     <string name="reset_all">全部恢复</string>
     <string name="pick">选择</string>
+    <string name="change">更换</string>
     <string name="preview">试听</string>
     <string name="clear">重置</string>
     <string name="default_sound">系统默认</string>
@@ -12,4 +14,6 @@
     <string name="tab_all">全部</string>
     <string name="tab_modified">已修改</string>
     <string name="empty_modified">还没有修改任何音效\n去「全部」里挑一个开始设置</string>
+    <string name="importing">正在导入…</string>
+    <string name="no_custom">还没有设置自定义音效</string>
 </resources>

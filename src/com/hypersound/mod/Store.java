@@ -19,6 +19,7 @@ public final class Store {
 
     public static final String PREFS = "hs_cfg";
     private static final String K_VER = "ver";
+    private static final String K_APPLIED = "applied";
     private static final String P_FILE = "f_";
     private static final String P_NAME = "n_";
 
@@ -61,14 +62,14 @@ public final class Store {
         if (d == null || src == null || !src.isFile()) {
             return;
         }
-        unmirror(c, key);
         String ext = extOf(src.getName());
         File dest = new File(d, key + ext);
+        File part = new File(d, "~" + key + ".part");
         FileInputStream in = null;
         FileOutputStream out = null;
         try {
             in = new FileInputStream(src);
-            out = new FileOutputStream(dest);
+            out = new FileOutputStream(part);
             byte[] buf = new byte[65536];
             int n;
             while ((n = in.read(buf)) > 0) {
@@ -79,6 +80,16 @@ public final class Store {
         } finally {
             close(in);
             close(out);
+        }
+        if (part.isFile() && part.length() > 0) {
+            unmirror(c, key);
+            if (!part.renameTo(dest)) {
+                //noinspection ResultOfMethodCallIgnored
+                part.delete();
+            }
+        } else {
+            //noinspection ResultOfMethodCallIgnored
+            part.delete();
         }
     }
 
@@ -120,6 +131,15 @@ public final class Store {
 
     public static void bump(Context c) {
         prefs(c).edit().putInt(K_VER, version(c) + 1).apply();
+    }
+
+    /** 上一次成功「应用更改」时的配置版本，用于提示有未应用的改动。 */
+    public static int appliedVersion(Context c) {
+        return prefs(c).getInt(K_APPLIED, 0);
+    }
+
+    public static void setAppliedVersion(Context c, int v) {
+        prefs(c).edit().putInt(K_APPLIED, v).apply();
     }
 
     /** 当前槽位生效的自定义文件，没有则返回 null。 */

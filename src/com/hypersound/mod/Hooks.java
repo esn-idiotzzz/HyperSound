@@ -34,6 +34,7 @@ public final class Hooks {
     private static XposedModule module;
     private static String proc = "?";
     private static volatile Context appCtx;
+    private static int ctxTries;
     private static boolean installed;
 
     private static long lastPush;
@@ -345,7 +346,7 @@ public final class Hooks {
     private static File mirrorFile(String key) {
         long now = System.currentTimeMillis();
         Map<String, File> m = mirrorCache;
-        if (m == null || now - mirrorAt > 3000) {
+        if (m == null || now - mirrorAt > 1500) {
             HashMap<String, File> map = new HashMap<String, File>();
             File[] fs = new File(MIRROR_DIR).listFiles();
             if (fs != null) {
@@ -376,6 +377,10 @@ public final class Hooks {
             if (c != null) {
                 return c;
             }
+            if (ctxTries >= 3) {
+                return null;
+            }
+            ctxTries++;
             try {
                 Class<?> at = Class.forName("android.app.ActivityThread");
                 Object thread = callStatic(at, "currentActivityThread");
@@ -436,6 +441,9 @@ public final class Hooks {
             return;
         }
         lastPush = now;
+        if ("android".equals(proc)) {
+            return;
+        }
         Context c = appCtx;
         if (c == null) {
             return;

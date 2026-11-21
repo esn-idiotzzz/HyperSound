@@ -6,7 +6,6 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.media.MediaPlayer;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
 import android.view.ViewGroup;
@@ -32,10 +31,12 @@ public class MainActivity extends Activity {
     private TextView tabAll;
     private TextView tabModified;
     private TextView empty;
+    private TextView btnApply;
     private Adapter adapter;
     private MediaPlayer player;
     private String pendingKey;
     private int mode = MODE_ALL;
+    private boolean importing;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -46,8 +47,9 @@ public class MainActivity extends Activity {
         tabAll = (TextView) findViewById(R.id.tab_all);
         tabModified = (TextView) findViewById(R.id.tab_modified);
         empty = (TextView) findViewById(R.id.tv_empty);
+        btnApply = (TextView) findViewById(R.id.btn_apply);
 
-        findViewById(R.id.btn_apply).setOnClickListener(new View.OnClickListener() {
+        btnApply.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 doApply();
@@ -56,7 +58,7 @@ public class MainActivity extends Activity {
         findViewById(R.id.btn_reset).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                confirmReset();
+                confirmResetAll();
             }
         });
         findViewById(R.id.btn_log).setOnClickListener(new View.OnClickListener() {
@@ -92,9 +94,23 @@ public class MainActivity extends Activity {
         rebuild();
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (adapter != null) {
+            rebuild();
+        }
+    }
+
     private void setMode(int m) {
+        if (mode == m) {
+            return;
+        }
         mode = m;
         rebuild();
+        if (list != null) {
+            list.setSelection(0);
+        }
     }
 
     private void rebuild() {
@@ -122,6 +138,10 @@ public class MainActivity extends Activity {
         tabModified.setText(getString(R.string.tab_modified) + " " + modified);
         styleTab(tabAll, mode == MODE_ALL);
         styleTab(tabModified, mode == MODE_MODIFIED);
+
+        boolean pending = Store.version(this) != Store.appliedVersion(this);
+        btnApply.setText(getString(pending ? R.string.apply_pending : R.string.apply));
+        btnApply.setAlpha(pending ? 1f : 0.82f);
 
         boolean blank = items.isEmpty();
         empty.setVisibility(blank ? View.VISIBLE : View.GONE);
@@ -157,37 +177,68 @@ public class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode != REQ_PICK || resultCode != RESULT_OK || data == null) {
+        if (requestCode != REQ_PICK) {
+            return;
+        }
+        final String key = pendingKey;
+        pendingKey = null;
+        if (resultCode != RESULT_OK || data == null || key == null) {
             return;
         }
         Uri uri = data.getData();
-        if (uri == null || pendingKey == null) {
+        if (uri == null) {
             return;
         }
-        if (Store.setSound(this, pendingKey, uri)) {
-            File f = Store.file(this, pendingKey);
-            long len = f == null ? 0 : f.length();
-            if (len > 2 * 1024 * 1024) {
-                toast("已设置（" + Store.sizeText(len) + "），提示音建议 1MB 以内");
-            } else {
-                toast("已设置，记得点「应用更改」");
-            }
-            rebuild();
-        } else {
-            toast("这个音频无法解码，换一个试试（推荐 ogg / wav / mp3）");
+        importSound(key, uri);
+    }
+
+    /** 拷贝 + 试解码放到后台线程，避免大文件卡 UI。 */
+    private void importSound(final String key, final Uri uri) {
+        if (importing) {
+            return;
         }
+        importing = true;
+        toast(getString(R.string.importing));
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                final boolean ok = Store.setSound(MainActivity.this, key, uri);
+                File f = ok ? Store.file(MainActivity.this, key) : null;
+                final long len = f == null ? 0 : f.length();
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        importing = false;
+                        if (!ok) {
+                            toast("这个音频无法解码，换一个试试（推荐 ogg / wav / mp3）");
+                            return;
+                        }
+                        if (len > 2 * 1024 * 1024) {
+                            toast("已设置（" + Store.sizeText(len) + "），提示音建议 1MB 以内");
+                        } else {
+                            toast("已设置，记得点「应用更改」");
+                        }
+                        rebuild();
+                    }
+                });
+            }
+        }).start();
     }
 
     private void preview(String key) {
-        File f = Store.file(this, key);
-        if (f == null) {
-            toast("还没有设置自定义音效");
+        if (Store.file(this, key) == null) {
+            toast(getString(R.string.no_custom));
+            return;
+        }
+        File file = Store.file(this, key);
+        if (file == null) {
+            toast(getString(R.string.no_custom));
             return;
         }
         stopPreview();
         try {
             player = new MediaPlayer();
-            player.setDataSource(f.getAbsolutePath());
+            player.setDataSource(file.getAbsolutePath());
             player.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
                 @Override
                 public void onCompletion(MediaPlayer mp) {
@@ -216,18 +267,32 @@ public class MainActivity extends Activity {
         }
     }
 
-    private void clearOne(String key) {
-        Store.clear(this, key);
-        rebuild();
-        toast("已恢复默认");
+    private void confirmResetOne(final Slots.Slot slot) {
+        if (Store.file(this, slot.key) == null) {
+            toast(getString(R.string.no_custom));
+            return;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("恢复「" + slot.label + "」")
+                .setMessage("删除该项的自定义音频，恢复系统默认？")
+                .setNegativeButton("取消", null)
+                .setPositiveButton("恢复默认", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int w) {
+                        Store.clear(MainActivity.this, slot.key);
+                        rebuild();
+                        toast("已恢复默认");
+                    }
+                })
+                .show();
     }
 
-    private void confirmReset() {
+    private void confirmResetAll() {
         new AlertDialog.Builder(this)
                 .setTitle("全部恢复默认")
-                .setMessage("删除所有自定义音效，全部回到系统默认？")
+                .setMessage("删除所有自定义音效（" + countModified() + " 项），全部回到系统默认？")
                 .setNegativeButton("取消", null)
-                .setPositiveButton("恢复", new DialogInterface.OnClickListener() {
+                .setPositiveButton("全部恢复", new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface d, int w) {
                         Store.clearAll(MainActivity.this);
@@ -238,7 +303,36 @@ public class MainActivity extends Activity {
                 .show();
     }
 
+    private int countModified() {
+        int n = 0;
+        for (Slots.Slot s : Slots.all()) {
+            if (Store.file(this, s.key) != null) {
+                n++;
+            }
+        }
+        return n;
+    }
+
     private void doApply() {
+        boolean pending = Store.version(this) != Store.appliedVersion(this);
+        if (!pending) {
+            new AlertDialog.Builder(this)
+                    .setTitle("没有未应用的更改")
+                    .setMessage("仍要重启系统界面吗？")
+                    .setNegativeButton("取消", null)
+                    .setPositiveButton("重启", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface d, int w) {
+                            restartSystemUi();
+                        }
+                    })
+                    .show();
+            return;
+        }
+        restartSystemUi();
+    }
+
+    private void restartSystemUi() {
         toast("正在重启系统界面…");
         new Thread(new Runnable() {
             @Override
@@ -248,6 +342,8 @@ public class MainActivity extends Activity {
                     @Override
                     public void run() {
                         if (ok) {
+                            Store.setAppliedVersion(MainActivity.this, Store.version(MainActivity.this));
+                            rebuild();
                             toast("系统界面已重启，锁屏/解锁等音效已生效");
                         } else {
                             showApplyHelp();
@@ -270,6 +366,7 @@ public class MainActivity extends Activity {
                 try {
                     Process p = new ProcessBuilder(su, "-c", cmd).redirectErrorStream(true).start();
                     if (p.waitFor() == 0) {
+                        sleep(800);
                         return true;
                     }
                 } catch (Throwable ignored) {
@@ -277,6 +374,13 @@ public class MainActivity extends Activity {
             }
         }
         return false;
+    }
+
+    private static void sleep(long ms) {
+        try {
+            Thread.sleep(ms);
+        } catch (InterruptedException ignored) {
+        }
     }
 
     private void showApplyHelp() {
@@ -384,7 +488,8 @@ public class MainActivity extends Activity {
 
             TextView sub = (TextView) v.findViewById(R.id.tv_sub);
             File f = Store.file(MainActivity.this, slot.key);
-            if (f != null) {
+            boolean custom = f != null;
+            if (custom) {
                 sub.setText(Store.displayName(MainActivity.this, slot.key)
                         + " · " + Store.sizeText(f.length()));
                 sub.setTextColor(0xFF4DA3FF);
@@ -394,27 +499,31 @@ public class MainActivity extends Activity {
             }
 
             TextView pickBtn = (TextView) v.findViewById(R.id.btn_pick);
-            pickBtn.setBackgroundResource(f != null
-                    ? R.drawable.bg_pill
-                    : R.drawable.bg_pill_accent);
-            pickBtn.setTextColor(f != null ? 0xFF8A96A8 : 0xFF08131F);
+            pickBtn.setText(getString(custom ? R.string.change : R.string.pick));
+            pickBtn.setBackgroundResource(custom ? R.drawable.bg_pill : R.drawable.bg_pill_accent);
+            pickBtn.setTextColor(custom ? 0xFF8A96A8 : 0xFF08131F);
 
-            v.findViewById(R.id.btn_pick).setOnClickListener(new View.OnClickListener() {
+            View play = v.findViewById(R.id.btn_play);
+            View reset = v.findViewById(R.id.btn_clear);
+            play.setAlpha(custom ? 1f : 0.3f);
+            reset.setAlpha(custom ? 1f : 0.3f);
+
+            pickBtn.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View x) {
                     pick(slot.key);
                 }
             });
-            v.findViewById(R.id.btn_play).setOnClickListener(new View.OnClickListener() {
+            play.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View x) {
                     preview(slot.key);
                 }
             });
-            v.findViewById(R.id.btn_clear).setOnClickListener(new View.OnClickListener() {
+            reset.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View x) {
-                    clearOne(slot.key);
+                    confirmResetOne(slot);
                 }
             });
             return v;
