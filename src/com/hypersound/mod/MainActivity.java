@@ -35,6 +35,8 @@ public class MainActivity extends Activity {
     private TextView tvSummary;
     private Adapter adapter;
     private MediaPlayer player;
+    private String playingKey;
+    private boolean paused;
     private String pendingKey;
     private int mode = MODE_ALL;
     private boolean importing;
@@ -244,10 +246,29 @@ public class MainActivity extends Activity {
             toast(getString(R.string.no_custom));
             return;
         }
+        MediaPlayer cur = player;
+        if (cur != null && key.equals(playingKey)) {
+            try {
+                if (cur.isPlaying()) {
+                    cur.pause();
+                    paused = true;
+                } else {
+                    cur.start();
+                    paused = false;
+                }
+            } catch (Throwable t) {
+                toast("播放失败：" + t.getMessage());
+                stopPreview();
+            }
+            notifyRows();
+            return;
+        }
         stopPreview();
         final MediaPlayer mp = new MediaPlayer();
         // 先把字段指向新实例，回调里再比对身份，避免上一次的完成回调把这一次顶掉。
         player = mp;
+        playingKey = key;
+        paused = false;
         try {
             mp.setAudioAttributes(new android.media.AudioAttributes.Builder()
                     .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
@@ -280,32 +301,41 @@ public class MainActivity extends Activity {
             }
             toast("播放失败：" + t.getMessage());
         }
+        notifyRows();
+    }
+
+    private void notifyRows() {
+        if (adapter != null) {
+            adapter.notifyDataSetChanged();
+        }
     }
 
     private void stopPreview() {
         MediaPlayer p = player;
         player = null;
-        if (p == null) {
-            return;
-        }
-        try {
-            p.setOnCompletionListener(null);
-        } catch (Throwable ignored) {
-        }
-        try {
-            p.setOnErrorListener(null);
-        } catch (Throwable ignored) {
-        }
-        try {
-            if (p.isPlaying()) {
-                p.stop();
+        playingKey = null;
+        paused = false;
+        if (p != null) {
+            try {
+                p.setOnCompletionListener(null);
+            } catch (Throwable ignored) {
             }
-        } catch (Throwable ignored) {
+            try {
+                p.setOnErrorListener(null);
+            } catch (Throwable ignored) {
+            }
+            try {
+                if (p.isPlaying()) {
+                    p.stop();
+                }
+            } catch (Throwable ignored) {
+            }
+            try {
+                p.release();
+            } catch (Throwable ignored) {
+            }
         }
-        try {
-            p.release();
-        } catch (Throwable ignored) {
-        }
+        notifyRows();
     }
 
     private void confirmResetOne(final Slots.Slot slot) {
@@ -620,6 +650,8 @@ public class MainActivity extends Activity {
             View reset = v.findViewById(R.id.btn_clear);
             play.setAlpha(custom ? 1f : 0.3f);
             reset.setAlpha(custom ? 1f : 0.3f);
+            boolean thisPlaying = slot.key.equals(playingKey) && !paused;
+            ((TextView) play).setText(thisPlaying ? "❚❚" : "▶");
 
             pickBtn.setOnClickListener(new View.OnClickListener() {
                 @Override
