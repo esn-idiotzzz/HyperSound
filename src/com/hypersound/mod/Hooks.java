@@ -80,6 +80,7 @@ public final class Hooks {
             int mps = hookMediaPlayer();
             hookAppContext();
             hookAssets();
+            hookProbes();
             installed = true;
             log("installed in " + process + " (SoundPool.load=" + loads + ", MediaPlayer=" + mps + ")");
             status("installed in " + process);
@@ -126,6 +127,86 @@ public final class Hooks {
         return n;
     }
 
+    /** 诊断探针：把相机等 App 的其它播放路径记录下来，便于定位。 */
+    private static void hookProbes() {
+        try {
+            Method[] ams = android.media.AudioManager.class.getDeclaredMethods();
+            for (Method m : ams) {
+                if (!"playSoundEffect".equals(m.getName())) {
+                    continue;
+                }
+                module.hook(m)
+                        .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
+                        .intercept(new XposedInterface.Hooker() {
+                            @Override
+                            public Object intercept(XposedInterface.Chain chain) throws Throwable {
+                                try {
+                                    probe("playSoundEffect " + chain.getArg(0));
+                                } catch (Throwable ignored) {
+                                }
+                                return chain.proceed();
+                            }
+                        });
+            }
+            Method[] mas = android.media.MediaActionSound.class.getDeclaredMethods();
+            for (Method m : mas) {
+                if (!"play".equals(m.getName())) {
+                    continue;
+                }
+                module.hook(m)
+                        .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
+                        .intercept(new XposedInterface.Hooker() {
+                            @Override
+                            public Object intercept(XposedInterface.Chain chain) throws Throwable {
+                                try {
+                                    probe("MediaActionSound " + chain.getArg(0));
+                                } catch (Throwable ignored) {
+                                }
+                                return chain.proceed();
+                            }
+                        });
+            }
+            Method open = android.content.res.AssetManager.class.getDeclaredMethod("open", String.class);
+            module.hook(open)
+                    .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
+                    .intercept(new XposedInterface.Hooker() {
+                        @Override
+                        public Object intercept(XposedInterface.Chain chain) throws Throwable {
+                            try {
+                                Object a = chain.getArg(0);
+                                if (a instanceof String) {
+                                    String n = ((String) a).toLowerCase();
+                                    if (n.endsWith(".wav") || n.endsWith(".ogg") || n.endsWith(".mp3")) {
+                                        probe("assetOpen " + a);
+                                    }
+                                }
+                            } catch (Throwable ignored) {
+                            }
+                            return chain.proceed();
+                        }
+                    });
+            log("probes installed");
+        } catch (Throwable t) {
+            log("hookProbes failed: " + t);
+        }
+    }
+
+    private static void probe(String msg) {
+        if (once.size() > 300 || !once.add("probe:" + msg)) {
+            return;
+        }
+        log("probe " + msg);
+        Context c = appCtx != null ? appCtx : context();
+        if (c == null) {
+            return;
+        }
+        try {
+            ContentValues v = new ContentValues();
+            v.put("line", "probe " + msg + "  @" + proc);
+            c.getContentResolver().insert(Uri.parse("content://com.hypersound.mod.sounds/log"), v);
+        } catch (Throwable ignored) {
+        }
+    }
     /** 相机等 App 通过 AssetManager 打开 assets 里的音频，这里记录名字与 AFD 的对应关系。 */
     private static void hookAssets() {
         try {
