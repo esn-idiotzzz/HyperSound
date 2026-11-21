@@ -22,15 +22,14 @@
         <item name="android:focusable">true</item>
     </style>
 
-    <style name="Tab">
-        <item name="android:layout_width">wrap_content</item>
-        <item name="android:layout_height">34dp</item>
+    <style name="TabSeg">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">match_parent</item>
+        <item name="android:layout_weight">1</item>
         <item name="android:gravity">center</item>
-        <item name="android:paddingLeft">16dp</item>
-        <item name="android:paddingRight">16dp</item>
         <item name="android:textSize">13sp</item>
         <item name="android:textColor">@color/text_dim</item>
-        <item name="android:background">@drawable/bg_tab_off</item>
+        <item name="android:background">@android:color/transparent</item>
         <item name="android:clickable">true</item>
         <item name="android:focusable">true</item>
     </style>
@@ -50,7 +49,7 @@
     </style>
 
     <style name="RowIcon">
-        <item name="android:layout_width">36dp</item>
+        <item name="android:layout_width">34dp</item>
         <item name="android:layout_height">30dp</item>
         <item name="android:layout_marginLeft">6dp</item>
         <item name="android:gravity">center</item>

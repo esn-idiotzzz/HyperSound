@@ -12,13 +12,20 @@
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingLeft="20dp"
-        android:paddingTop="20dp"
+        android:paddingTop="18dp"
         android:paddingRight="16dp"
-        android:paddingBottom="8dp">
+        android:paddingBottom="6dp">
+
+        <ImageView
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:contentDescription="@string/app_name"
+            android:src="@mipmap/ic_launcher" />
 
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_marginLeft="12dp"
             android:layout_weight="1"
             android:orientation="vertical">
 
@@ -27,13 +34,13 @@
                 android:layout_height="wrap_content"
                 android:text="@string/app_name"
                 android:textColor="@color/text"
-                android:textSize="22sp"
+                android:textSize="20sp"
                 android:textStyle="bold" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="3dp"
+                android:layout_marginTop="2dp"
                 android:text="@string/subtitle"
                 android:textColor="@color/text_dim"
                 android:textSize="11sp" />
@@ -45,27 +52,37 @@
             android:text="@string/log" />
     </LinearLayout>
 
-    <LinearLayout
+    <TextView
+        android:id="@+id/tv_summary"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:paddingLeft="20dp"
+        android:paddingTop="2dp"
+        android:paddingRight="20dp"
+        android:paddingBottom="10dp"
+        android:textColor="@color/text_dim"
+        android:textSize="12sp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="40dp"
+        android:layout_marginLeft="16dp"
+        android:layout_marginRight="16dp"
+        android:layout_marginBottom="10dp"
+        android:background="@drawable/bg_pill"
         android:orientation="horizontal"
-        android:paddingLeft="16dp"
-        android:paddingTop="6dp"
-        android:paddingRight="16dp"
-        android:paddingBottom="10dp">
+        android:padding="3dp">
 
         <TextView
             android:id="@+id/tab_all"
-            style="@style/Tab"
+            style="@style/TabSeg"
             android:text="@string/tab_all" />
 
         <TextView
             android:id="@+id/tab_modified"
-            style="@style/Tab"
-            android:layout_marginLeft="8dp"
+            style="@style/TabSeg"
             android:text="@string/tab_modified" />
     </LinearLayout>
-
 
     <FrameLayout
         android:layout_width="match_parent"

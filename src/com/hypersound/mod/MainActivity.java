@@ -32,6 +32,7 @@ public class MainActivity extends Activity {
     private TextView tabModified;
     private TextView empty;
     private TextView btnApply;
+    private TextView tvSummary;
     private Adapter adapter;
     private MediaPlayer player;
     private String pendingKey;
@@ -48,6 +49,7 @@ public class MainActivity extends Activity {
         tabModified = (TextView) findViewById(R.id.tab_modified);
         empty = (TextView) findViewById(R.id.tv_empty);
         btnApply = (TextView) findViewById(R.id.btn_apply);
+        tvSummary = (TextView) findViewById(R.id.tv_summary);
 
         btnApply.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -143,6 +145,14 @@ public class MainActivity extends Activity {
         boolean pending = Store.version(this) != Store.appliedVersion(this);
         btnApply.setText(getString(pending ? R.string.apply_pending : R.string.apply));
         btnApply.setAlpha(pending ? 1f : 0.82f);
+
+        String sum = "已修改 " + modified + " / " + total + " 项";
+        if (pending) {
+            sum = sum + "   ·   有未应用更改";
+        }
+        tvSummary.setText(sum);
+        tvSummary.setTextColor(pending ? 0xFFFFB86B : 0xFF8A96A8);
+
         boolean blank = items.isEmpty();
         empty.setVisibility(blank ? View.VISIBLE : View.GONE);
         list.setVisibility(blank ? View.GONE : View.VISIBLE);
@@ -156,7 +166,7 @@ public class MainActivity extends Activity {
     }
 
     private void styleTab(TextView tv, boolean on) {
-        tv.setBackgroundResource(on ? R.drawable.bg_tab_on : R.drawable.bg_tab_off);
+        tv.setBackgroundResource(on ? R.drawable.bg_tab_on : android.R.color.transparent);
         tv.setTextColor(on ? 0xFF08131F : 0xFF8A96A8);
     }
 

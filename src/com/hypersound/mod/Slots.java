@@ -8,7 +8,6 @@ import java.util.Map;
 
 /**
  * 系统音效槽位表，按 Xiaomi 15 / HyperOS 4.0 真机实际播放的文件校准。
- * 只保留已确认有播放者的槽位。
  */
 public final class Slots {
 
@@ -43,13 +42,11 @@ public final class Slots {
     }
 
     static {
-        // 锁屏与解锁（SystemUI 按路径加载）
         add("lock", "锁屏音", "锁屏与解锁", "Lock.ogg",
                 "lock", "lockscreen", "locksound", "screenlock", "keyguardlock");
         add("unlock", "解锁音", "锁屏与解锁", "Unlock.ogg",
                 "unlock", "unlockscreen", "unlocksound", "screenunlock", "lockscreen_off");
 
-        // 充电与电量（安全中心 MediaPlayer 按路径加载）
         add("charge", "插入充电器", "充电与电量", "charging.ogg",
                 "charging", "charge", "charger", "connectpower", "powerconnect");
         add("charge_wireless", "无线充电", "充电与电量", "charge_wireless.ogg",
@@ -59,27 +56,16 @@ public final class Slots {
         add("low_power", "低电量", "充电与电量", "LowBattery.ogg",
                 "lowbattery", "lowpower", "batterylow", "warning", "warrning");
 
-        // 截图（com.miui.screenshot）
         add("screenshot", "截图", "截图", "screenshot.ogg",
                 "screenshot", "screenshots", "screenshotkr", "capture", "shot");
 
-        // 通话与消息
-        add("in_call", "通话提示", "通话与消息", "InCallNotification.ogg",
-                "incallnotification", "incall");
-        add("message_sending", "消息发送中", "通话与消息", "MessageSending.ogg",
-                "messagesending", "sendingsound");
-        add("message_sent", "消息已发送", "通话与消息", "MessageSent.ogg",
+        add("message_sent", "消息已发送", "消息", "MessageSent.ogg",
                 "messagesent", "messagesendout", "messagesentout");
-        add("incoming_message", "新消息", "通话与消息", "IncomingMessage.ogg",
+        add("incoming_message", "新消息", "消息", "IncomingMessage.ogg",
                 "incomingmessage", "newmessage");
 
-        // 铃声与闹钟（MediaPlayer + Settings）
-        add("notification", "通知提示音", "铃声与闹钟", "Settings · notification_sound",
+        add("notification", "通知提示音", "通知", "Settings · notification_sound",
                 "notification", "notificationsound", "notify");
-        add("alarm", "闹钟铃声", "铃声与闹钟", "Settings · alarm_alert",
-                "alarm", "alarmsound", "alarmalert", "dynamicalarmspeech");
-        add("ringtone", "来电铃声", "铃声与闹钟", "Settings · ringtone",
-                "ringtone", "miuiweekringtone");
     }
 
     public static List<Slot> all() {
@@ -125,14 +111,8 @@ public final class Slots {
         if (n.contains("lowbatt")) {
             return BY_KEY.get("low_power");
         }
-        if (n.contains("incall")) {
-            return BY_KEY.get("in_call");
-        }
         if (n.contains("incomingmessage")) {
             return BY_KEY.get("incoming_message");
-        }
-        if (n.contains("messagesending")) {
-            return BY_KEY.get("message_sending");
         }
         if (n.contains("messagesent") || n.contains("messagesendout")) {
             return BY_KEY.get("message_sent");
