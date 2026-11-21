@@ -223,10 +223,7 @@ public final class Hooks {
         String s = uri.toString();
         try {
             android.content.ContentResolver cr = c.getContentResolver();
-            String notify = Settings.System.getString(cr, "notification_sound");
-            if (notify != null && notify.equals(s)) {
-                return Slots.byKey("notification");
-            }
+
             String chg = Settings.Global.getString(cr, "charging_started_sound");
             if (chg != null && chg.equals(s)) {
                 return Slots.byKey("charge");

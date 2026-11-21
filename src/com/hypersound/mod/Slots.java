@@ -64,8 +64,6 @@ public final class Slots {
         add("incoming_message", "新消息", "消息", "IncomingMessage.ogg",
                 "incomingmessage", "newmessage");
 
-        add("notification", "通知提示音", "通知", "Settings · notification_sound",
-                "notification", "notificationsound", "notify");
     }
 
     public static List<Slot> all() {

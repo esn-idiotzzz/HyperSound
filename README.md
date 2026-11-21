@@ -6,9 +6,9 @@
 - 包名：`com.hypersound.mod`，模块名 `HyperSound`，版本 4.0
 - 框架：LSPosed（libxposed API 101）
 - 校准机型：Xiaomi 15（`24129PN74C`），HyperOS `OS4.0.4.0.XOCCNXM`，API 37
-- 只保留真机上**已确认有播放者**的 10 个音效
+- 只保留真机上**已确认有播放者**的 9 个音效
 
-## 支持的音效（10 项）
+## 支持的音效（9 项）
 
 | 分组 | 音效 | 系统文件 | 播放进程 |
 |---|---|---|---|
@@ -21,7 +21,6 @@
 | 截图 | 截图 | `screenshot.ogg` | com.miui.screenshot |
 | 消息 | 消息已发送 | `MessageSent.ogg` | com.android.mms |
 | | 新消息 | `IncomingMessage.ogg` | com.android.mms |
-| 通知 | 通知提示音 | `Settings.System · notification_sound` | com.android.systemui |
 
 ## 推荐作用域（5 个）
 
@@ -41,6 +40,7 @@ com.android.mms             消息
 - 通话提示（由 SystemUI 的来电界面播放，场景不可控）
 - 消息发送中（短信 App 实际不走该文件）
 - 来电铃声 / 闹钟（系统设置里可直接改，模块不重复做）
+- 通知提示音（由系统通知/媒体播放，无法按文件稳定定位）
 
 ## 使用
 
