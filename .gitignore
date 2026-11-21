@@ -1,0 +1,7 @@
+build/
+output*/
+*.jks
+*.keystore
+.idea/
+*.iml
+.DS_Store
