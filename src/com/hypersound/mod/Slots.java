@@ -63,6 +63,8 @@ public final class Slots {
                 "messagesent", "messagesendout", "messagesentout");
         add("incoming_message", "新消息", "消息", "IncomingMessage.ogg",
                 "incomingmessage", "newmessage");
+        add("notification", "通知提示音（短信/通知）", "通知", "Settings · notification_sound",
+                "notification", "notificationsound", "notify");
 
     }
 
