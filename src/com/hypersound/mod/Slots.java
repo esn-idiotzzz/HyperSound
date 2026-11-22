@@ -60,8 +60,7 @@ public final class Slots {
                 "screenshot", "screenshots", "screenshotkr", "capture", "shot");
 
         add("message_sent", "消息已发送", "消息", "MessageSent.ogg",
-                "messagesent", "messagesendout", "messagesentout");        add("ringtone", "来电铃声", "铃声与通知", "Settings · ringtone",
-                "ringtone", "miuiweekringtone");
+                "messagesent", "messagesendout", "messagesentout");
     }
 
     public static List<Slot> all() {

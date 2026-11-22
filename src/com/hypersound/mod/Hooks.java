@@ -44,6 +44,7 @@ public final class Hooks {
     /** 出错过多时自动停用，避免极端情况下拖垮宿主进程。 */
     private static volatile boolean disabled;
     private static int failCount;
+    private static java.util.concurrent.ExecutorService logExec;
     private static volatile long mirrorAt;
 
     private Hooks() {
@@ -443,9 +444,7 @@ public final class Hooks {
             return;
         }
         try {
-            ContentValues v = new ContentValues();
-            v.put("line", "\u25cf " + msg);
-            c.getContentResolver().insert(Uri.parse("content://com.hypersound.mod.sounds/log"), v);
+            submitLog(c, "\u25cf " + msg);
         } catch (Throwable ignored) {
         }
     }
@@ -469,9 +468,7 @@ public final class Hooks {
             return;
         }
         try {
-            ContentValues v = new ContentValues();
-            v.put("line", "miss: " + base + "  @" + proc);
-            c.getContentResolver().insert(Uri.parse("content://com.hypersound.mod.sounds/log"), v);
+            submitLog(c, "miss: " + base + "  @" + proc);
         } catch (Throwable ignored) {
         }
     }
@@ -487,9 +484,7 @@ public final class Hooks {
             return;
         }
         try {
-            ContentValues v = new ContentValues();
-            v.put("line", "seen " + slot.key + "  @" + proc);
-            c.getContentResolver().insert(Uri.parse("content://com.hypersound.mod.sounds/log"), v);
+            submitLog(c, "seen " + slot.key + "  @" + proc);
         } catch (Throwable ignored) {
         }
     }
@@ -516,9 +511,45 @@ public final class Hooks {
             return;
         }
         try {
-            ContentValues v = new ContentValues();
-            v.put("line", "[" + proc + "] " + msg);
-            c.getContentResolver().insert(Uri.parse("content://com.hypersound.mod.sounds/log"), v);
+            submitLog(c, "[" + proc + "] " + msg);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    /** 日志写入放到独立低优先级线程，避免在音频回调里做同步 binder 调用。 */
+    private static void submitLog(final Context c, final String line) {
+        if (c == null) {
+            return;
+        }
+        try {
+            if (logExec == null) {
+                synchronized (Hooks.class) {
+                    if (logExec == null) {
+                        java.util.concurrent.ThreadFactory tf = new java.util.concurrent.ThreadFactory() {
+                            @Override
+                            public Thread newThread(Runnable r) {
+                                Thread t = new Thread(r, "hs-log");
+                                t.setDaemon(true);
+                                t.setPriority(Thread.MIN_PRIORITY);
+                                return t;
+                            }
+                        };
+                        logExec = java.util.concurrent.Executors.newSingleThreadExecutor(tf);
+                    }
+                }
+            }
+            logExec.execute(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        ContentValues v = new ContentValues();
+                        v.put("line", line);
+                        c.getContentResolver().insert(
+                                Uri.parse("content://com.hypersound.mod.sounds/log"), v);
+                    } catch (Throwable ignored) {
+                    }
+                }
+            });
         } catch (Throwable ignored) {
         }
     }
