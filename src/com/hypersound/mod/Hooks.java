@@ -41,13 +41,16 @@ public final class Hooks {
     private static final ThreadLocal<Boolean> REPLACING = new ThreadLocal<Boolean>();
 
     private static volatile Map<String, File> mirrorCache;
+    /** 出错过多时自动停用，避免极端情况下拖垮宿主进程。 */
+    private static volatile boolean disabled;
+    private static int failCount;
     private static volatile long mirrorAt;
 
     private Hooks() {
     }
 
     public static synchronized void install(XposedModule m, String process, ClassLoader cl) {
-        if (installed) {
+        if (installed || "com.hypersound.mod".equals(process)) {
             return;
         }
         module = m;
@@ -126,7 +129,7 @@ public final class Hooks {
     private static final class LoadHook implements XposedInterface.Hooker {
         @Override
         public Object intercept(XposedInterface.Chain chain) throws Throwable {
-            if (Boolean.TRUE.equals(REPLACING.get())) {
+            if (disabled || Boolean.TRUE.equals(REPLACING.get())) {
                 return chain.proceed();
             }
             try {
@@ -157,7 +160,7 @@ public final class Hooks {
                     }
                 }
             } catch (Throwable t) {
-                logOnce("load err: " + t);
+                noteFail(t, "load");
             }
             return chain.proceed();
         }
@@ -166,7 +169,7 @@ public final class Hooks {
     private static final class PlayerHook implements XposedInterface.Hooker {
         @Override
         public Object intercept(XposedInterface.Chain chain) throws Throwable {
-            if (Boolean.TRUE.equals(REPLACING.get())) {
+            if (disabled || Boolean.TRUE.equals(REPLACING.get())) {
                 return chain.proceed();
             }
             try {
@@ -197,7 +200,7 @@ public final class Hooks {
                     }
                 }
             } catch (Throwable t) {
-                logOnce("media err: " + t);
+                noteFail(t, "media");
             }
             return chain.proceed();
         }
@@ -223,19 +226,6 @@ public final class Hooks {
         String s = uri.toString();
         try {
             android.content.ContentResolver cr = c.getContentResolver();
-
-            String ring = Settings.System.getString(cr, Settings.System.RINGTONE);
-            if (ring != null && ring.equals(s)) {
-                return Slots.byKey("ringtone");
-            }
-            String notify = Settings.System.getString(cr, "notification_sound");
-            if (notify != null && notify.equals(s)) {
-                return Slots.byKey("notification");
-            }
-            String alarm = Settings.System.getString(cr, "alarm_alert");
-            if (alarm != null && alarm.equals(s)) {
-                return Slots.byKey("alarm");
-            }
             String chg = Settings.Global.getString(cr, "charging_started_sound");
             if (chg != null && chg.equals(s)) {
                 return Slots.byKey("charge");
@@ -425,6 +415,14 @@ public final class Hooks {
                 module.log(4, TAG, "[" + proc + "] " + msg);
             }
         } catch (Throwable ignored) {
+        }
+    }
+
+    static void noteFail(Throwable t, String where) {
+        logOnce(where + " err: " + t);
+        if (++failCount > 15 && !disabled) {
+            disabled = true;
+            log("too many errors, hooks disabled in " + proc);
         }
     }
 

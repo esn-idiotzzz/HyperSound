@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">澎湃音效</string>
-    <string name="subtitle">HyperOS 4 · 11 项系统音效</string>
+    <string name="subtitle">HyperOS 4 · 8 项系统音效</string>
     <string name="apply">应用更改</string>
     <string name="apply_pending">应用更改 •</string>
     <string name="reset_all">全部恢复</string>
