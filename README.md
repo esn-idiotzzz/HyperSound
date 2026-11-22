@@ -3,7 +3,7 @@
 面向 **小米澎湃OS 4（HyperOS 4）** 的 LSPosed 系统音效自定义模块。
 桌面打开即可替换系统音效，支持试听与恢复默认。
 
-- 包名：`com.hypersound.mod`，模块名 `HyperSound`，版本 5.1
+- 包名：`com.hypersound.mod`，模块名 `HyperSound`，版本 5.2
 - 框架：LSPosed（libxposed API 101）
 - 校准机型：Xiaomi 15（`24129PN74C`），HyperOS `OS4.0.4.0.XOCCNXM`，API 37
 - 只保留真机上**已确认有播放者**的 8 个音效
@@ -44,7 +44,7 @@ com.android.mms             消息
 
 ## 使用
 
-1. 安装 `HyperSound-5.1.apk`
+1. 安装 `HyperSound-5.2.apk`
 2. LSPosed → HyperSound → 启用，勾选上面 5 个作用域
 3. 重启手机（首次必需）
 4. 打开 App → 选音效 → 选文件 → **应用更改**
