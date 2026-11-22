@@ -57,6 +57,7 @@ public class SoundProvider extends ContentProvider {
             String line = values.getAsString("line");
             if (line != null) {
                 Store.appendLog(getContext(), line);
+                return uri;
             }
         }
         return null;

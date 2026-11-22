@@ -223,6 +223,7 @@ public class MainActivity extends Activity {
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
+                        if (isFinishing() || isDestroyed()) { return; }
                         importing = false;
                         if (!ok) {
                             toast("这个音频无法解码，换一个试试（推荐 ogg / wav / mp3）");
@@ -429,6 +430,7 @@ public class MainActivity extends Activity {
                 runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
+                        if (isFinishing() || isDestroyed()) { return; }
                         if (n > 0) {
                             Store.setAppliedVersion(MainActivity.this, Store.version(MainActivity.this));
                             rebuild();
@@ -527,6 +529,10 @@ public class MainActivity extends Activity {
 
     private void showLog() {
         String log = Store.readLog(this);
+        int count = 0;
+        if (log.length() > 0) {
+            count = log.split("\n").length;
+        }
         if (log.length() == 0) {
             log = "暂无日志。\n\n如果音效没有生效：\n"
                     + "1. 确认 LSPosed 里已启用模块并勾选作用域；\n"
@@ -543,7 +549,7 @@ public class MainActivity extends Activity {
         ScrollView sv = new ScrollView(this);
         sv.addView(tv);
         new AlertDialog.Builder(this)
-                .setTitle("运行日志")
+                .setTitle("运行日志 · 最近 " + count + " 条 / 最多 " + Store.LOG_MAX_LINES + " 条")
                 .setView(sv)
                 .setNegativeButton("关闭", null)
                 .setNeutralButton("清空", new DialogInterface.OnClickListener() {

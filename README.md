@@ -3,7 +3,7 @@
 面向 **小米澎湃OS 4（HyperOS 4）** 的 LSPosed 系统音效自定义模块。
 桌面打开即可替换系统音效，支持试听与恢复默认。
 
-- 包名：`com.hypersound.mod`，模块名 `HyperSound`，版本 4.0
+- 包名：`com.hypersound.mod`，模块名 `HyperSound`，版本 5.0
 - 框架：LSPosed（libxposed API 101）
 - 校准机型：Xiaomi 15（`24129PN74C`），HyperOS `OS4.0.4.0.XOCCNXM`，API 37
 - 只保留真机上**已确认有播放者**的 11 个音效
@@ -46,13 +46,13 @@ com.android.incallui        来电铃声
 
 ## 使用
 
-1. 安装 `HyperSound-4.0.apk`
+1. 安装 `HyperSound-5.0.apk`
 2. LSPosed → HyperSound → 启用，勾选上面 5 个作用域
 3. 重启手机（首次必需）
 4. 打开 App → 选音效 → 选文件 → **应用更改**
    - 应用更改会自动重启相关进程（系统界面、安全中心、截图、短信）并刷新系统音效，无需手动打开这些 App
 
-## 排错（右上角「日志」）
+## 排错（右上角「日志」，只保留最近 50 条）
 
 - `● installed in <进程>`：该进程已注入
 - `替换 xxx`：替换成功
@@ -60,6 +60,7 @@ com.android.incallui        来电铃声
 - `miss: xxx.ogg`：系统请求了但模块不认识这个文件名
 
 > 只有设置过的槽位才会替换，未设置的保持系统原声。
+> 运行日志自动裁剪为最近 50 条，不会无限增长。
 
 ## 构建
 

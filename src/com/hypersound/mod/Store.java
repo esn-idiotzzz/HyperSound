@@ -490,18 +490,66 @@ public final class Store {
         return new File(de(c).getFilesDir(), "hook.log");
     }
 
+    /** 运行日志最多保留的条数。 */
+    public static final int LOG_MAX_LINES = 50;
+
     public static synchronized void appendLog(Context c, String line) {
         try {
             File f = logFile(c);
-            if (f.length() > 96 * 1024) {
-                //noinspection ResultOfMethodCallIgnored
-                f.delete();
-            }
             String ts = new SimpleDateFormat("HH:mm:ss", Locale.US).format(new Date());
             FileOutputStream o = new FileOutputStream(f, true);
             o.write((ts + "  " + line + "\n").getBytes("UTF-8"));
             o.close();
+            trimLog(f);
         } catch (Throwable ignored) {
+        }
+    }
+
+    /** 只保留最近 LOG_MAX_LINES 条，避免日志无限增长。 */
+    private static void trimLog(File f) {
+        if (!f.isFile() || f.length() <= 256) {
+            return;
+        }
+        java.io.BufferedReader r = null;
+        java.util.LinkedList<String> lines = new java.util.LinkedList<String>();
+        try {
+            r = new java.io.BufferedReader(new java.io.InputStreamReader(new FileInputStream(f), "UTF-8"));
+            String s;
+            while ((s = r.readLine()) != null) {
+                lines.add(s);
+                while (lines.size() > LOG_MAX_LINES) {
+                    lines.removeFirst();
+                }
+            }
+        } catch (Throwable t) {
+            return;
+        } finally {
+            close(r);
+        }
+        if (lines.size() <= LOG_MAX_LINES) {
+            return;
+        }
+        File tmp = new File(f.getParentFile(), "hook.log.tmp");
+        java.io.BufferedWriter w = null;
+        try {
+            w = new java.io.BufferedWriter(new java.io.OutputStreamWriter(new FileOutputStream(tmp), "UTF-8"));
+            for (String l : lines) {
+                w.write(l);
+                w.write('\n');
+            }
+            w.flush();
+        } catch (Throwable t) {
+            close(w);
+            //noinspection ResultOfMethodCallIgnored
+            tmp.delete();
+            return;
+        }
+        close(w);
+        if (!tmp.renameTo(f)) {
+            //noinspection ResultOfMethodCallIgnored
+            f.delete();
+            //noinspection ResultOfMethodCallIgnored
+            tmp.renameTo(f);
         }
     }
 
@@ -522,7 +570,18 @@ public final class Store {
                 off += n;
             }
             in.close();
-            return new String(b, 0, off, "UTF-8");
+            String all = new String(b, 0, off, "UTF-8");
+            String[] lines = all.split("\n");
+            if (lines.length <= LOG_MAX_LINES) {
+                return all;
+            }
+            StringBuilder sb = new StringBuilder(all.length() / 2);
+            for (int i = lines.length - LOG_MAX_LINES; i < lines.length; i++) {
+                if (lines[i].length() > 0) {
+                    sb.append(lines[i]).append('\n');
+                }
+            }
+            return sb.toString();
         } catch (Throwable t) {
             return "";
         }

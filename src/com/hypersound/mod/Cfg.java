@@ -14,7 +14,7 @@ final class Cfg {
 
     private static final String AUTH = "com.hypersound.mod.sounds";
     private static final Uri URI_CONFIG = Uri.parse("content://" + AUTH + "/config");
-    private static final long TTL = 3000L;
+    private static final long TTL = 1500L;
 
     private static volatile Cfg cached;
 
@@ -70,11 +70,15 @@ final class Cfg {
                     }
                 }
                 s = new Cfg(map);
-                cached = s;
+                if (!map.isEmpty()) {
+                    cached = s;
+                }
                 return s;
             }
         } catch (Throwable t) {
             Hooks.logOnce("cfg error: " + t);
+            // 读取失败不缓存，下一次事件再试，避免刚改完音效却一直用空配置。
+            return new Cfg(new HashMap<String, String>());
         } finally {
             if (cur != null) {
                 try {
@@ -83,8 +87,6 @@ final class Cfg {
                 }
             }
         }
-        s = new Cfg(new HashMap<String, String>());
-        cached = s;
-        return s;
+        return new Cfg(new HashMap<String, String>());
     }
 }
